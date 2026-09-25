@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">الأستاذ القماش</string>
+    <string name="title_activity_main">الأستاذ القماش</string>
+    <string name="package_name">com.qammash.app</string>
+    <string name="custom_url_scheme">com.qammash.app</string>
+</resources>

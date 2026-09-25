@@ -13,3 +13,6 @@ opencode.json
 AGENTS.md
 backend/createUser.js
 backend/prisma/migrations
+frontend/android/.gradle
+frontend/android/build
+frontend/android/app/build

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { login } from '../api'
 import { useAuth } from '../context/AuthContext'
+import { Html5QrcodeScanner } from 'html5-qrcode'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -10,6 +11,26 @@ export default function LoginPage() {
   const [form, setForm] = useState({ username: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showScanner, setShowScanner] = useState(false)
+  const scannerRef = useRef(null)
+
+  useEffect(() => {
+    if (showScanner) {
+      const scanner = new Html5QrcodeScanner('laptop-qr-reader', { fps: 10, qrbox: { width: 220, height: 220 } }, false)
+      scannerRef.current = scanner
+      scanner.render((decodedText) => {
+        if (decodedText.startsWith('http://') || decodedText.startsWith('https://')) {
+          scanner.clear().catch(() => {})
+          setShowScanner(false)
+          window.location.href = decodedText
+        }
+      }, () => {})
+
+      return () => {
+        scanner.clear().catch(() => {})
+      }
+    }
+  }, [showScanner])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -86,7 +107,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">اسم المستخدم</label>
+            <label className="form-label" style={{ color: '#e3f2fd' }}>اسم المستخدم</label>
             <div style={{ position: 'relative' }}>
               <i className="pi pi-user" style={{
                 position: 'absolute', right: '0.9rem', top: '50%',
@@ -106,7 +127,7 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">كلمة المرور</label>
+            <label className="form-label" style={{ color: '#e3f2fd' }}>كلمة المرور</label>
             <div style={{ position: 'relative' }}>
               <i className="pi pi-lock" style={{
                 position: 'absolute', right: '0.9rem', top: '50%',
@@ -132,12 +153,59 @@ export default function LoginPage() {
           >
             {loading ? <><i className="pi pi-spin pi-spinner" /> جاري الدخول...</> : <><i className="pi pi-sign-in" /> تسجيل الدخول</>}
           </button>
+
+          {/* Quick Connect Scanner for Mobile APK / Phone */}
+          <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setShowScanner(true)}
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#e3f2fd',
+                borderRadius: '8px',
+                padding: '0.65rem 1rem',
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                width: '100%',
+                justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+            >
+              <i className="pi pi-qrcode" style={{ color: '#42a5f5' }} />
+              مسح كود شاشة اللاب توب للربط الفوري
+            </button>
+          </div>
         </form>
 
         <p style={{ textAlign: 'center', color: 'rgba(144,202,249,0.5)', fontSize: '0.8rem', marginTop: '1.5rem', marginBottom: 0 }}>
           منصة الأستاذ القماش &copy; {new Date().getFullYear()}
         </p>
       </div>
+
+      {/* QR Scanner Modal for Phone / APK */}
+      {showScanner && (
+        <div className="modal-overlay" onClick={() => setShowScanner(false)} style={{ zIndex: 9999 }}>
+          <div className="modal" style={{ maxWidth: '380px', textAlign: 'center', background: '#1a1a2e', color: '#fff', border: '1px solid #30475e' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.75rem', justifyContent: 'space-between' }}>
+              <h3 className="modal-title" style={{ color: '#fff', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <i className="pi pi-camera" style={{ color: '#42a5f5' }} />
+                وجّه الكاميرا نحو كود اللاب توب
+              </h3>
+              <button className="modal-close" onClick={() => setShowScanner(false)} style={{ color: '#fff' }}>×</button>
+            </div>
+            <div style={{ padding: '1rem 0' }}>
+              <div id="laptop-qr-reader" style={{ width: '100%', margin: '0 auto' }}></div>
+              <p style={{ fontSize: '0.8rem', color: '#90caf9', marginTop: '0.75rem', lineHeight: 1.5 }}>
+                افتح زر "📱 ربط الموبايل" في اللاب توب ووجّه كاميرا الهاتف نحو الكود للاتصال التلقائي بدون إنترنت
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

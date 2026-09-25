@@ -1,0 +1,12 @@
+{
+  "appId": "com.qammash.app",
+  "appName": "الأستاذ القماش",
+  "webDir": "dist",
+  "server": {
+    "cleartext": true,
+    "allowNavigation": ["*"]
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
