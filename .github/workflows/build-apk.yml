@@ -30,8 +30,9 @@ jobs:
 
       - name: Install Android SDK 36 & Accept Licenses
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          export SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | $SDKMANAGER --licenses || true
+          $SDKMANAGER "platforms;android-36" "build-tools;36.0.0"
 
       - name: Install Frontend & Build Web Assets
         run: |
