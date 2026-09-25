@@ -1,0 +1,15 @@
+backend/node_modules
+backend/.env
+backend/prisma/dev.db
+frontend/node_modules
+frontend/dist
+.DS_Store
+*.swp
+*.swo
+.vscode
+node_modules
+.env
+opencode.json
+AGENTS.md
+backend/createUser.js
+backend/prisma/migrations

@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int         @id @default(autoincrement())
+  username   String      @unique
+  password   String
+  role       String      @default("assistant") // "teacher" | "assistant"
+  permissions String      @default("[]") // JSON array of permissions
+  dateJoined DateTime    @default(now())
+  actionLogs ActionLog[]
+  chatMessages ChatMessage[]
+}
+
+model ActionLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  action    String
+  path      String
+  method    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Offer {
+  id       Int       @id @default(autoincrement())
+  title    String
+  type     String    @default("percentage") // "percentage", "amount", "sessions"
+  value    Float     @default(0)
+  students Student[]
+}
+
+model Group {
+  id       Int       @id @default(autoincrement())
+  name     String
+  grade    String
+  students Student[]
+  sessions Session[]
+  exams    Exam[]
+}
+
+model Student {
+  id            Int            @id @default(autoincrement())
+  name          String
+  phoneNumber   String
+  dadPhoneNumber String
+  sex           String
+  groupId       Int
+  offerId       Int
+  active        Boolean        @default(false)
+  group         Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  offer         Offer          @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  attendance    Attendance[]
+  eachPayments  EachPayment[]
+  studentDegrees StudentDegree[]
+  bookBookings  BookBooking[]
+  chatMessages  ChatMessage[]
+}
+
+model Session {
+  id         Int          @id @default(autoincrement())
+  groupId    Int?
+  grade      String?      // مستخدم فقط للمحاضرات (type = "lecture") — الحصص العادية تستخدم groupId
+  title      String
+  type       String       @default("session") // "session" | "lecture"
+  description String?
+  location   String?
+  duration   Float
+  price      Float
+  date       DateTime     @default(now())
+  active     Boolean      @default(false)
+  group      Group?       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  attendance Attendance[]
+}
+
+model Attendance {
+  id          Int     @id @default(autoincrement())
+  studentId   Int
+  sessionId   Int
+  isAttendant Boolean @default(false)
+  amountPaid  Float   @default(0)
+  student     Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  session     Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, sessionId])
+}
+
+model EachPayment {
+  id              Int      @id @default(autoincrement())
+  studentId       Int
+  amount          Float    @default(0)
+  type            String   @default("sessions") // "sessions" | "book"
+  targetName      String?  // E.g., "Paid for Session 1, 2" or "Book Physics"
+  allocations     String   @default("[]") // JSON array of { type: 'attendance'|'bookBooking', id: Int, amount: Float }
+  lastPaymentDate DateTime @default(now())
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model Exam {
+  id            Int             @id @default(autoincrement())
+  title         String
+  totalDegree   Float
+  minPassDegree Float           @default(0)
+  groupId       Int?
+  grade         String?
+  group         Group?          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  studentDegrees StudentDegree[]
+}
+
+model StudentDegree {
+  id            Int     @id @default(autoincrement())
+  studentId     Int
+  examId        Int
+  studentDegree Float?
+  student       Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  exam          Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, examId])
+}
+
+model Book {
+  id           Int           @id @default(autoincrement())
+  title        String
+  grade        String?
+  price        Float         @default(0)
+  bookBookings BookBooking[]
+
+  @@unique([title, grade])
+}
+
+model BookBooking {
+  id            Int      @id @default(autoincrement())
+  studentId     Int
+  bookId        Int
+  quantity      Int      @default(1)
+  discountType  String?  // "percentage", "amount"
+  discountValue Float?   @default(0)
+  amountPaid    Float    @default(0)
+  delivered     Boolean  @default(false)
+  deliveredAt   DateTime?
+  createdAt     DateTime @default(now())
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  book          Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, bookId])
+}
+
+model ChatMessage {
+  id            Int      @id @default(autoincrement())
+  studentId     Int?
+  recipientType String   @default("unknown") // "student" | "parent" | "unknown"
+  phoneNumber   String
+  waMessageId   String?  @unique
+  direction     String   @default("outgoing") // "outgoing" | "incoming"
+  message       String
+  status        String   @default("queued") // "queued" | "sent" | "delivered" | "read" | "failed" | "received"
+  seenAt        DateTime?
+  error         String?
+  sentByUserId  Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  student       Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  sentBy        User?    @relation(fields: [sentByUserId], references: [id], onDelete: SetNull)
+
+  @@index([studentId])
+  @@index([phoneNumber])
+  @@index([createdAt])
+}
+
+model ChatWebhookEvent {
+  id        Int      @id @default(autoincrement())
+  eventType String   @default("received")
+  payload   String
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// قوالب الرسائل النصية المستخدمة ضمن نافذة الـ 24 ساعة
+model NotificationTemplate {
+  id        Int      @id @default(autoincrement())
+  name      String   // اسم القالب
+  type      String   // "attendance" | "exam_grade" | "new_session" | "new_lecture" | "payment_added_sessions" | "payment_added_book"
+  body      String   // نص الرسالة مع {{placeholders}}
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SessionStore {
+  id        String   @id
+  sid       String   @unique
+  data      String
+  expiresAt DateTime
+}

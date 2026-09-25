@@ -1,0 +1,30 @@
+# Query: EditProfileModal
+# ContextLines: 1
+
+8 results - 1 file
+
+frontend\src\components\Layout.jsx:
+   34    const [sidebarOpen, setSidebarOpen] = useState(false)
+   35:   c
+   36    const [profileForm, setProfileForm] = useState({ username: '', password: '' })
+
+   47      setMsg(null)
+   48:     setEditProfileModal(true)
+   49      setSidebarOpen(false)
+
+   57        setMsg({ type: 'success', text: 'تم تحديث البيانات بنجاح' })
+   58:       setTimeout(() => setEditProfileModal(false), 1500)
+   59      } catch (err) {
+
+  138        {/* Edit Profile Modal */}
+  139:       {editProfileModal && (
+  140:         <div className="modal-overlay" onClick={() => setEditProfileModal(false)} style={{ zIndex: 1000 }}>
+  141            <div className="modal" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+
+  143                <h3 className="modal-title"><i className="pi pi-user-edit" /> تعديل بيانات الحساب</h3>
+  144:               <button className="modal-close" onClick={() => setEditProfileModal(false)}><i className="pi pi-times" /></button>
+  145              </div>
+
+  161                  <button type="submit" className="btn btn-primary"><i className="pi pi-check" /> حفظ</button>
+  162:                 <button type="button" className="btn btn-secondary" onClick={() => setEditProfileModal(false)}>إلغاء</button>
+  163                </div>
