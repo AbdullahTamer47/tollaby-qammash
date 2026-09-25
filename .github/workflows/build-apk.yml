@@ -28,9 +28,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Accept Android SDK Licenses
+      - name: Install Android SDK 36 & Accept Licenses
         run: |
           yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
       - name: Install Frontend & Build Web Assets
         run: |
