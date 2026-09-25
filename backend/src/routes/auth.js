@@ -15,6 +15,30 @@ function parsePermissions(value) {
   return [];
 }
 
+// GET /api/auth/quick-users
+router.get('/quick-users', async (req, res) => {
+  const prisma = req.app.locals.prisma;
+  try {
+    const users = await prisma.user.findMany({
+      select: { id: true, username: true, role: true },
+      orderBy: [{ role: 'desc' }, { id: 'asc' }]
+    });
+
+    const formatted = users.map(u => ({
+      id: u.id,
+      username: u.username,
+      displayName: u.role === 'teacher' ? 'مستر محمد القماش' : u.username.replace(/_/g, ' '),
+      role: u.role,
+      avatar: u.role === 'teacher' ? '👨‍🏫' : '🧑‍💼'
+    }));
+
+    res.json(formatted);
+  } catch (err) {
+    console.error('Error fetching quick users:', err);
+    res.status(500).json({ error: 'فشل جلب المستخدمين' });
+  }
+});
+
 // POST /api/auth/login
 router.post('/login', (req, res, next) => {
   const limiter = req.app.locals.rateLimiters?.loginLimiter;

@@ -51,7 +51,8 @@ export default function TopBar({ user, onMenuToggle }) {
   }
 
   const port = window.location.port || '5173'
-  const connectUrl = selectedIp ? `http://${selectedIp}:${port}` : window.location.origin
+  const baseUrl = selectedIp ? `http://${selectedIp}:${port}` : window.location.origin
+  const connectUrl = `${baseUrl}/login?connect=true`
 
   const copyUrl = () => {
     navigator.clipboard.writeText(connectUrl).then(() => {

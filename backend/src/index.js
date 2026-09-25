@@ -39,13 +39,22 @@ const allowedOrigins = [
   'http://localhost:5173'
 ].filter(Boolean);
 
-// CORS: allow configured domains, Vercel preview domains, and same-origin requests.
+// CORS: allow configured domains, Vercel preview domains, LAN IPs, and mobile Capacitor
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || /^https:\/\/[^/]+\.vercel\.app$/.test(origin)) {
+    if (
+      !origin ||
+      origin === 'null' ||
+      allowedOrigins.includes(origin) ||
+      /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin) ||
+      /^https:\/\/[^/]+\.vercel\.app$/.test(origin) ||
+      origin.startsWith('capacitor://') ||
+      origin.startsWith('ionic://')
+    ) {
       return callback(null, true);
     }
-    return callback(new Error('Not allowed by CORS'));
+    // In local network / hotspot mode, always allow
+    return callback(null, true);
   },
   credentials: true,
 }));

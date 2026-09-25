@@ -1,10 +1,20 @@
 import axios from 'axios'
 
+const savedServer = typeof window !== 'undefined' ? localStorage.getItem('qammash_server_url') : null;
+const apiBase = savedServer ? `${savedServer}/api` : (import.meta.env.VITE_API_URL || '/api');
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: apiBase,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' }
 });
+
+export const setCustomServerUrl = (url) => {
+  if (!url) return;
+  const clean = url.replace(/\/+$/, '');
+  localStorage.setItem('qammash_server_url', clean);
+  api.defaults.baseURL = `${clean}/api`;
+};
 
 api.interceptors.response.use(
   response => response,
@@ -40,6 +50,8 @@ export const createAssistant = (data) => api.post('/auth/assistants', data)
 export const getAssistants = () => api.get('/auth/assistants')
 export const updateAssistant = (id, data) => api.put(`/auth/assistants/${id}`, data)
 export const deleteAssistant = (id) => api.delete(`/auth/assistants/${id}`)
+export const getQuickUsers = () => api.get('/auth/quick-users')
+
 
 // Students
 export const getStudents = (params) => api.get('/students', { params })
