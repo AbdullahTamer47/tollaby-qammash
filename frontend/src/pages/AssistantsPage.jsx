@@ -9,8 +9,7 @@ const PERMISSION_OPTIONS = [
   { id: 'attendance', label: 'الحضور والغياب' },
   { id: 'payments', label: 'إدارة المدفوعات' },
   { id: 'exams', label: 'الامتحانات والدرجات' },
-  { id: 'books', label: 'الكتب والمذكرات' },
-  { id: 'chat', label: 'الشات / واتساب' }
+  { id: 'books', label: 'الكتب والمذكرات' }
 ]
 
 export default function AssistantsPage() {

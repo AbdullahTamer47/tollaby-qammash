@@ -23,10 +23,8 @@ const MENU_ITEMS = [
   { section: 'أدوات' },
   { to: '/books', icon: 'pi pi-book', label: 'الكتب والحجوزات', perm: 'books' },
   { to: '/qrcodes', icon: 'pi pi-qrcode', label: 'رموز QR', perm: 'students' },
-  { to: '/chat', icon: 'pi pi-whatsapp', label: 'الشات / واتساب', perm: 'chat' },
-  { to: '/archive', icon: 'pi pi-inbox', label: 'أرشيف الرسائل', perm: 'chat' },
-  { to: '/templates', icon: 'pi pi-file-edit', label: 'قوالب الرسائل', perm: 'chat' },
 ]
+
 
 export default function Layout() {
   const { user, setUser } = useAuth()
@@ -85,7 +83,7 @@ export default function Layout() {
       <aside className={`layout-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="layout-sidebar-logo">
           <div className="logo-icon"><i className="pi pi-graduation-cap" /></div>
-          <span>طلابي</span>
+          <span>الأستاذ القماش</span>
         </div>
 
         <ul className="layout-menu">

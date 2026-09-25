@@ -73,8 +73,8 @@ export default function LoginPage() {
           }}>
             <i className="pi pi-graduation-cap" />
           </div>
-          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800, color: '#e3f2fd' }}>طلابي</h1>
-          <p style={{ margin: '0.4rem 0 0', color: '#90caf9', fontSize: '0.9rem' }}>نظام إدارة الطلاب</p>
+          <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800, color: '#e3f2fd' }}>الأستاذ القماش</h1>
+          <p style={{ margin: '0.4rem 0 0', color: '#90caf9', fontSize: '0.9rem' }}>نظام إدارة الطلاب والدروس</p>
         </div>
 
         {error && (
@@ -135,7 +135,7 @@ export default function LoginPage() {
         </form>
 
         <p style={{ textAlign: 'center', color: 'rgba(144,202,249,0.5)', fontSize: '0.8rem', marginTop: '1.5rem', marginBottom: 0 }}>
-          طلابي &copy; {new Date().getFullYear()}
+          منصة الأستاذ القماش &copy; {new Date().getFullYear()}
         </p>
       </div>
     </div>

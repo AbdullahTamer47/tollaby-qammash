@@ -21,11 +21,9 @@ const ExamDegreesPage = lazy(() => import('./pages/ExamDegreesPage'))
 const BooksPage = lazy(() => import('./pages/BooksPage'))
 const QRCodesPage = lazy(() => import('./pages/QRCodesPage'))
 const SearchPage = lazy(() => import('./pages/SearchPage'))
-const ChatPage = lazy(() => import('./pages/ChatPage'))
 const AssistantsPage = lazy(() => import('./pages/AssistantsPage'))
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
-const NotificationTemplatesPage = lazy(() => import('./pages/NotificationTemplatesPage'))
-const ArchivePage = lazy(() => import('./pages/ArchivePage'))
+
 
 function ProtectedRoute({ children, teacherOnly = false, permission }) {
   const { user, loading } = useAuth()
@@ -75,9 +73,6 @@ function AppRoutes() {
 
           <Route path="books" element={<ProtectedRoute permission="books"><BooksPage /></ProtectedRoute>} />
           <Route path="qrcodes" element={<ProtectedRoute permission="students"><QRCodesPage /></ProtectedRoute>} />
-          <Route path="chat" element={<ProtectedRoute permission="chat"><ChatPage /></ProtectedRoute>} />
-          <Route path="archive" element={<ProtectedRoute permission="chat"><ArchivePage /></ProtectedRoute>} />
-          <Route path="templates" element={<ProtectedRoute permission="chat"><NotificationTemplatesPage /></ProtectedRoute>} />
           <Route path="search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
         </Route>
 
