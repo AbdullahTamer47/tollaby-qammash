@@ -28,7 +28,10 @@ router.post('/login', (req, res, next) => {
     const user = await prisma.user.findUnique({ where: { username } });
     if (!user) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
 
-    const valid = await bcrypt.compare(password, user.password);
+    let valid = await bcrypt.compare(password, user.password);
+    if (!valid && typeof password === 'string' && password.includes(' ')) {
+      valid = await bcrypt.compare(password.replace(/\s+/g, ''), user.password);
+    }
     if (!valid) return res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
 
     req.session.userId = user.id;

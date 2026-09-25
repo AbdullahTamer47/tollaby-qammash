@@ -150,7 +150,7 @@ router.post('/', async (req, res) => {
       }
     });
 
-    await logAction(prisma, req.session.userId, `إضافة مصروف: ${expense.title} بقيمة ${expense.amount}`, '/api/expenses', 'POST');
+    await logAction(prisma, req, `إضافة مصروف: ${expense.title} بقيمة ${expense.amount}`, 'POST');
     res.status(201).json(expense);
   } catch (err) {
     console.error('Error creating expense:', err);
@@ -189,7 +189,7 @@ router.put('/:id', async (req, res) => {
       data: updateData
     });
 
-    await logAction(prisma, req.session.userId, `تعديل مصروف #${id}: ${updated.title}`, '/api/expenses', 'PUT');
+    await logAction(prisma, req, `تعديل مصروف #${id}: ${updated.title}`, 'PUT');
     res.json(updated);
   } catch (err) {
     console.error('Error updating expense:', err);
@@ -209,7 +209,7 @@ router.delete('/:id', async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'بند المصروف غير موجود' });
 
     await prisma.expense.delete({ where: { id } });
-    await logAction(prisma, req.session.userId, `حذف مصروف #${id}: ${existing.title}`, '/api/expenses', 'DELETE');
+    await logAction(prisma, req, `حذف مصروف #${id}: ${existing.title}`, 'DELETE');
     res.json({ message: 'تم حذف المصروف بنجاح' });
   } catch (err) {
     console.error('Error deleting expense:', err);
