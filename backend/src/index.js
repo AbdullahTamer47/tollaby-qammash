@@ -1,4 +1,16 @@
 require('dotenv').config();
+
+// Default cloud database & session secret fallbacks for zero-config cloud deployment
+const DEFAULT_DATABASE_URL = "postgresql://neondb_owner:npg_EY5GmxONt4yF@ep-young-union-abwr6fhi-pooler.eu-west-2.aws.neon.tech/tollabytestDB?sslmode=require&channel_binding=require";
+const DEFAULT_SESSION_SECRET = "RhZa58RuanU8hOaJwDNVIhpm6kgtDGxXrD1CD91HyayJl";
+
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = DEFAULT_DATABASE_URL;
+}
+if (!process.env.SESSION_SECRET) {
+  process.env.SESSION_SECRET = DEFAULT_SESSION_SECRET;
+}
+
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
@@ -7,7 +19,6 @@ const { PrismaClient } = require('@prisma/client');
 const compression = require('compression');
 const helmet = require('helmet');
 const os = require('os');
-
 
 const prisma = new PrismaClient();
 const app = express();
