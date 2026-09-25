@@ -15,20 +15,23 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams()
   const { setUser, refreshUser } = useAuth()
 
-  // State
+  // By default: standard login unless opened via QR scan (?connect=true or ?scanned=true)
+  const isDirectConnectParam = searchParams.get('connect') === 'true' || searchParams.get('scanned') === 'true'
+  const [isScannedMode, setIsScannedMode] = useState(isDirectConnectParam)
+
+  // Users for scanned mode
   const [quickUsers, setQuickUsers] = useState(DEFAULT_USERS)
   const [selectedUser, setSelectedUser] = useState(null)
+
+  // Form state
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [manualUsername, setManualUsername] = useState('')
-  const [isManualMode, setIsManualMode] = useState(false)
 
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
-  const [scannedAlert, setScannedAlert] = useState(
-    searchParams.get('scanned') === 'true' || searchParams.get('connect') === 'true'
-  )
+  const [scannedAlert, setScannedAlert] = useState(isDirectConnectParam)
   const scannerRef = useRef(null)
 
   // Fetch live users from server
@@ -39,9 +42,7 @@ export default function LoginPage() {
           setQuickUsers(res.data)
         }
       })
-      .catch(() => {
-        // Fallback already in state
-      })
+      .catch(() => {})
   }
 
   useEffect(() => {
@@ -71,10 +72,12 @@ export default function LoginPage() {
             // Set custom server for Capacitor & Axios
             setCustomServerUrl(targetUrl.origin)
 
-            if (targetUrl.origin === currentOrigin) {
-              setScannedAlert(true)
-              loadUsers()
-            } else {
+            // Switch to scanned account picker mode
+            setIsScannedMode(true)
+            setScannedAlert(true)
+            loadUsers()
+
+            if (targetUrl.origin !== currentOrigin) {
               window.location.href = `${targetUrl.origin}/login?connect=true`
             }
           }
@@ -93,9 +96,9 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
 
-    const usernameToLogin = isManualMode ? manualUsername.trim() : selectedUser?.username
+    const usernameToLogin = isScannedMode ? selectedUser?.username : username.trim()
     if (!usernameToLogin) {
-      setError('يرجى اختيار الحساب أو كتابة اسم المستخدم')
+      setError('يرجى كتابة أو اختيار اسم المستخدم')
       return
     }
 
@@ -121,7 +124,7 @@ export default function LoginPage() {
       background: 'linear-gradient(135deg, #0a1128 0%, #101f42 50%, #070d1f 100%)',
       padding: '1.25rem 1rem'
     }}>
-      {/* Ambient background glow */}
+      {/* Ambient glow blobs */}
       <div style={{
         position: 'fixed', top: '-120px', right: '-120px',
         width: '420px', height: '420px',
@@ -162,33 +165,9 @@ export default function LoginPage() {
             منصة الأستاذ محمد القماش
           </h1>
           <p style={{ margin: '0.4rem 0 0', color: '#94a3b8', fontSize: '0.88rem' }}>
-            نظام إدارة المجموعات والدروس والربط بالهاتف
+            {isScannedMode ? 'ربط الهاتف وتسجيل الدخول السريع' : 'نظام إدارة الطلاب والدروس والسنتر'}
           </p>
         </div>
-
-        {/* Success Banner when connected via QR scan or URL param */}
-        {scannedAlert && (
-          <div style={{
-            background: 'rgba(16, 185, 129, 0.15)',
-            border: '1px solid rgba(16, 185, 129, 0.4)',
-            borderRadius: '14px',
-            padding: '0.85rem 1rem',
-            color: '#a7f3d0',
-            fontSize: '0.88rem',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.65rem'
-          }}>
-            <i className="pi pi-check-circle" style={{ color: '#10b981', fontSize: '1.35rem', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontWeight: 700, color: '#34d399' }}>تم الاتصال بلاب توب مستر محمد القماش!</div>
-              <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '2px' }}>
-                اختر حسابك أدناه واكتب الباسورد للربط فوراً
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Error Alert */}
         {error && (
@@ -198,317 +177,368 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* 1. QUICK USER PICKER (Teacher or Assistants) */}
-        {!isManualMode && !selectedUser && (
+        {/* ======================================================== */}
+        {/* CASE 1: SCANNED MODE (AFTER MOBILE SCANS LAPTOP QR)      */}
+        {/* ======================================================== */}
+        {isScannedMode ? (
           <div>
+            {/* Success Banner */}
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: '0.9rem'
-            }}>
-              <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <i className="pi pi-users" style={{ color: '#60a5fa' }} />
-                اختر حسابك للدخول السريع:
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {quickUsers.map(u => {
-                const isTeacher = u.role === 'teacher'
-                return (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => { setSelectedUser(u); setError(''); setPassword(''); }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '0.95rem 1.1rem',
-                      background: isTeacher
-                        ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(29, 78, 216, 0.12))'
-                        : 'rgba(255, 255, 255, 0.05)',
-                      border: isTeacher
-                        ? '1.5px solid rgba(59, 130, 246, 0.55)'
-                        : '1px solid rgba(255, 255, 255, 0.12)',
-                      borderRadius: '16px',
-                      color: '#fff',
-                      cursor: 'pointer',
-                      textAlign: 'right',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      width: '100%',
-                      boxShadow: isTeacher ? '0 4px 15px rgba(37, 99, 235, 0.15)' : 'none'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = isTeacher
-                        ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.35), rgba(29, 78, 216, 0.25))'
-                        : 'rgba(255, 255, 255, 0.1)'
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = isTeacher
-                        ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(29, 78, 216, 0.12))'
-                        : 'rgba(255, 255, 255, 0.05)'
-                      e.currentTarget.style.transform = 'translateY(0)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                      <span style={{
-                        fontSize: '1.75rem',
-                        width: '44px',
-                        height: '44px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: isTeacher ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.07)',
-                        borderRadius: '12px'
-                      }}>
-                        {u.avatar}
-                      </span>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: '1.02rem', color: '#f1f5f9' }}>
-                          {u.displayName}
-                        </div>
-                        <div style={{
-                          fontSize: '0.78rem',
-                          color: isTeacher ? '#93c5fd' : '#94a3b8',
-                          marginTop: '2px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.3rem'
-                        }}>
-                          <span style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            background: isTeacher ? '#3b82f6' : '#10b981',
-                            display: 'inline-block'
-                          }} />
-                          {isTeacher ? 'المعلم ورئيس المنصة' : 'مساعد معتمد'}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      color: '#93c5fd',
-                      fontSize: '0.82rem',
-                      fontWeight: 600
-                    }}>
-                      <span>دخول</span>
-                      <i className="pi pi-arrow-left" style={{ fontSize: '0.75rem' }} />
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* 2. SELECTED USER PASSWORD PROMPT */}
-        {!isManualMode && selectedUser && (
-          <form onSubmit={handleSubmit}>
-            <div style={{
-              background: selectedUser.role === 'teacher' ? 'rgba(37, 99, 235, 0.18)' : 'rgba(16, 185, 129, 0.12)',
-              border: `1.5px solid ${selectedUser.role === 'teacher' ? 'rgba(59, 130, 246, 0.45)' : 'rgba(16, 185, 129, 0.4)'}`,
-              borderRadius: '18px',
-              padding: '1rem 1.15rem',
+              background: 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              borderRadius: '14px',
+              padding: '0.85rem 1rem',
+              color: '#a7f3d0',
+              fontSize: '0.88rem',
               marginBottom: '1.35rem',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between'
+              gap: '0.65rem'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                <span style={{ fontSize: '2rem' }}>{selectedUser.avatar}</span>
-                <div>
-                  <div style={{ fontWeight: 800, color: '#f8fafc', fontSize: '1.08rem' }}>
-                    {selectedUser.displayName}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: selectedUser.role === 'teacher' ? '#93c5fd' : '#86efac', marginTop: '1px' }}>
-                    {selectedUser.role === 'teacher' ? 'حساب المعلم الرئيسي' : 'حساب المساعد'}
-                  </div>
+              <i className="pi pi-check-circle" style={{ color: '#10b981', fontSize: '1.35rem', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: 700, color: '#34d399' }}>تم الاتصال بلاب توب مستر محمد القماش بنجاح!</div>
+                <div style={{ fontSize: '0.78rem', color: '#cbd5e1', marginTop: '2px' }}>
+                  اختر حسابك أدناه واكتب الباسورد للربط فوراً
                 </div>
               </div>
+            </div>
+
+            {/* List of Accounts (if none selected yet) */}
+            {!selectedUser && (
+              <div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '0.9rem'
+                }}>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <i className="pi pi-users" style={{ color: '#60a5fa' }} />
+                    من أنت؟ اختر حسابك للربط:
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                  {quickUsers.map(u => {
+                    const isTeacher = u.role === 'teacher'
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => { setSelectedUser(u); setError(''); setPassword(''); }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.95rem 1.1rem',
+                          background: isTeacher
+                            ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(29, 78, 216, 0.12))'
+                            : 'rgba(255, 255, 255, 0.05)',
+                          border: isTeacher
+                            ? '1.5px solid rgba(59, 130, 246, 0.55)'
+                            : '1px solid rgba(255, 255, 255, 0.12)',
+                          borderRadius: '16px',
+                          color: '#fff',
+                          cursor: 'pointer',
+                          textAlign: 'right',
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          width: '100%',
+                          boxShadow: isTeacher ? '0 4px 15px rgba(37, 99, 235, 0.15)' : 'none'
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = isTeacher
+                            ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.35), rgba(29, 78, 216, 0.25))'
+                            : 'rgba(255, 255, 255, 0.1)'
+                          e.currentTarget.style.transform = 'translateY(-2px)'
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = isTeacher
+                            ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(29, 78, 216, 0.12))'
+                            : 'rgba(255, 255, 255, 0.05)'
+                          e.currentTarget.style.transform = 'translateY(0)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                          <span style={{
+                            fontSize: '1.75rem',
+                            width: '44px',
+                            height: '44px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: isTeacher ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.07)',
+                            borderRadius: '12px'
+                          }}>
+                            {u.avatar}
+                          </span>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: '1.02rem', color: '#f1f5f9' }}>
+                              {u.displayName}
+                            </div>
+                            <div style={{
+                              fontSize: '0.78rem',
+                              color: isTeacher ? '#93c5fd' : '#94a3b8',
+                              marginTop: '2px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.3rem'
+                            }}>
+                              <span style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: isTeacher ? '#3b82f6' : '#10b981',
+                                display: 'inline-block'
+                              }} />
+                              {isTeacher ? 'المعلم ورئيس المنصة' : 'مساعد معتمد'}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          color: '#93c5fd',
+                          fontSize: '0.82rem',
+                          fontWeight: 600
+                        }}>
+                          <span>دخول</span>
+                          <i className="pi pi-arrow-left" style={{ fontSize: '0.75rem' }} />
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Selected User Password Form */}
+            {selectedUser && (
+              <form onSubmit={handleSubmit}>
+                <div style={{
+                  background: selectedUser.role === 'teacher' ? 'rgba(37, 99, 235, 0.18)' : 'rgba(16, 185, 129, 0.12)',
+                  border: `1.5px solid ${selectedUser.role === 'teacher' ? 'rgba(59, 130, 246, 0.45)' : 'rgba(16, 185, 129, 0.4)'}`,
+                  borderRadius: '18px',
+                  padding: '1rem 1.15rem',
+                  marginBottom: '1.35rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <span style={{ fontSize: '2rem' }}>{selectedUser.avatar}</span>
+                    <div>
+                      <div style={{ fontWeight: 800, color: '#f8fafc', fontSize: '1.08rem' }}>
+                        {selectedUser.displayName}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: selectedUser.role === 'teacher' ? '#93c5fd' : '#86efac', marginTop: '1px' }}>
+                        {selectedUser.role === 'teacher' ? 'حساب المعلم الرئيسي' : 'حساب المساعد'}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedUser(null); setPassword(''); }}
+                    style={{
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: '8px',
+                      color: '#e2e8f0',
+                      cursor: 'pointer',
+                      fontSize: '0.78rem',
+                      padding: '0.35rem 0.65rem'
+                    }}
+                  >
+                    تغيير الحساب
+                  </button>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '1.35rem' }}>
+                  <label className="form-label" style={{ color: '#e2e8f0', fontSize: '0.9rem', marginBottom: '0.5rem', display: 'block' }}>
+                    أدخل كلمة المرور لـ ({selectedUser.displayName})
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <i className="pi pi-lock" style={{
+                      position: 'absolute', right: '1rem', top: '50%',
+                      transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.95rem'
+                    }} />
+                    <input
+                      className="form-control"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder={selectedUser.role === 'teacher' ? 'كلمة المرور (مثال: admin 123)' : 'كلمة المرور (مثال: 123)'}
+                      required
+                      autoFocus
+                      style={{
+                        paddingRight: '2.6rem',
+                        paddingLeft: '2.6rem',
+                        fontSize: '16px',
+                        height: '48px',
+                        borderRadius: '12px',
+                        background: 'rgba(255,255,255,0.07)',
+                        borderColor: 'rgba(255,255,255,0.15)',
+                        color: '#fff'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute', left: '0.85rem', top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none', border: 'none',
+                        color: '#94a3b8', cursor: 'pointer', fontSize: '1rem',
+                        padding: '0.2rem'
+                      }}
+                      title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                    >
+                      <i className={`pi ${showPassword ? 'pi-eye-slash' : 'pi-eye'}`} />
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary w-full"
+                  disabled={loading}
+                  style={{
+                    justifyContent: 'center',
+                    padding: '0.9rem',
+                    fontSize: '1.02rem',
+                    borderRadius: '14px',
+                    fontWeight: 700,
+                    boxShadow: '0 8px 20px rgba(59, 130, 246, 0.4)'
+                  }}
+                >
+                  {loading ? (
+                    <><i className="pi pi-spin pi-spinner" style={{ marginLeft: '0.5rem' }} /> جاري الدخول...</>
+                  ) : (
+                    <><i className="pi pi-sign-in" style={{ marginLeft: '0.5rem' }} /> دخول وربط الحساب الآن</>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* Switch back to Standard Login */}
+            <div style={{ textAlign: 'center', marginTop: '1.25rem' }}>
               <button
                 type="button"
-                onClick={() => { setSelectedUser(null); setPassword(''); }}
+                onClick={() => { setIsScannedMode(false); setSelectedUser(null); setError(''); }}
                 style={{
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: '8px',
-                  color: '#e2e8f0',
+                  background: 'none',
+                  border: 'none',
+                  color: '#93c5fd',
+                  fontSize: '0.84rem',
                   cursor: 'pointer',
-                  fontSize: '0.78rem',
-                  padding: '0.35rem 0.65rem',
-                  transition: 'all 0.2s'
+                  textDecoration: 'underline'
                 }}
               >
-                تغيير الحساب
+                ← العودة لتسجيل الدخول العادي
               </button>
             </div>
-
-            <div className="form-group" style={{ marginBottom: '1.35rem' }}>
-              <label className="form-label" style={{ color: '#e2e8f0', fontSize: '0.9rem', marginBottom: '0.5rem', display: 'block' }}>
-                أدخل كلمة المرور لـ ({selectedUser.displayName})
-              </label>
-              <div style={{ position: 'relative' }}>
-                <i className="pi pi-lock" style={{
-                  position: 'absolute', right: '1rem', top: '50%',
-                  transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.95rem'
-                }} />
-                <input
-                  className="form-control"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder={selectedUser.role === 'teacher' ? 'كلمة المرور (مثال: admin 123)' : 'كلمة المرور (مثال: 123)'}
-                  required
-                  autoFocus
-                  style={{
-                    paddingRight: '2.6rem',
-                    paddingLeft: '2.6rem',
-                    fontSize: '16px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: 'rgba(255,255,255,0.07)',
-                    borderColor: 'rgba(255,255,255,0.15)',
-                    color: '#fff'
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute', left: '0.85rem', top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none', border: 'none',
-                    color: '#94a3b8', cursor: 'pointer', fontSize: '1rem',
-                    padding: '0.2rem'
-                  }}
-                  title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
-                >
-                  <i className={`pi ${showPassword ? 'pi-eye-slash' : 'pi-eye'}`} />
-                </button>
+          </div>
+        ) : (
+          /* ======================================================== */
+          /* CASE 2: STANDARD LOGIN FORM (DEFAULT FOR PC & MOBILE)    */
+          /* ======================================================== */
+          <div>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group" style={{ marginBottom: '1.1rem' }}>
+                <label className="form-label" style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>اسم المستخدم</label>
+                <div style={{ position: 'relative' }}>
+                  <i className="pi pi-user" style={{
+                    position: 'absolute', right: '1rem', top: '50%',
+                    transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.95rem'
+                  }} />
+                  <input
+                    className="form-control"
+                    type="text"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    placeholder="ادخل اسم المستخدم (مثال: admin)"
+                    required
+                    autoFocus
+                    style={{
+                      paddingRight: '2.6rem', fontSize: '16px', height: '48px',
+                      borderRadius: '12px', background: 'rgba(255,255,255,0.07)',
+                      borderColor: 'rgba(255,255,255,0.15)', color: '#fff'
+                    }}
+                  />
+                </div>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              className="btn btn-primary w-full"
-              disabled={loading}
-              style={{
-                justifyContent: 'center',
-                padding: '0.9rem',
-                fontSize: '1.02rem',
-                borderRadius: '14px',
-                fontWeight: 700,
-                boxShadow: '0 8px 20px rgba(59, 130, 246, 0.4)'
-              }}
-            >
-              {loading ? (
-                <><i className="pi pi-spin pi-spinner" style={{ marginLeft: '0.5rem' }} /> جاري الدخول...</>
-              ) : (
-                <><i className="pi pi-sign-in" style={{ marginLeft: '0.5rem' }} /> دخول وربط الحساب الآن</>
-              )}
-            </button>
-          </form>
+              <div className="form-group" style={{ marginBottom: '1.35rem' }}>
+                <label className="form-label" style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>كلمة المرور</label>
+                <div style={{ position: 'relative' }}>
+                  <i className="pi pi-lock" style={{
+                    position: 'absolute', right: '1rem', top: '50%',
+                    transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.95rem'
+                  }} />
+                  <input
+                    className="form-control"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="ادخل كلمة المرور"
+                    required
+                    style={{
+                      paddingRight: '2.6rem', paddingLeft: '2.6rem', fontSize: '16px',
+                      height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.07)',
+                      borderColor: 'rgba(255,255,255,0.15)', color: '#fff'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute', left: '0.85rem', top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none', border: 'none',
+                      color: '#94a3b8', cursor: 'pointer', fontSize: '1rem',
+                      padding: '0.2rem'
+                    }}
+                    title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                  >
+                    <i className={`pi ${showPassword ? 'pi-eye-slash' : 'pi-eye'}`} />
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary w-full"
+                disabled={loading}
+                style={{
+                  justifyContent: 'center', padding: '0.9rem',
+                  fontSize: '1.02rem', borderRadius: '14px', fontWeight: 700,
+                  boxShadow: '0 8px 20px rgba(59, 130, 246, 0.4)'
+                }}
+              >
+                {loading ? <><i className="pi pi-spin pi-spinner" style={{ marginLeft: '0.5rem' }} /> جاري الدخول...</> : <><i className="pi pi-sign-in" style={{ marginLeft: '0.5rem' }} /> تسجيل الدخول</>}
+              </button>
+            </form>
+
+            {/* Quick Switch to User Picker */}
+            <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+              <button
+                type="button"
+                onClick={() => { setIsScannedMode(true); setError(''); }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#93c5fd',
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                أو الدخول السريع باختيار الحساب (معلم / مساعد)
+              </button>
+            </div>
+          </div>
         )}
-
-        {/* 3. MANUAL LOGIN MODE */}
-        {isManualMode && (
-          <form onSubmit={handleSubmit}>
-            <div className="form-group" style={{ marginBottom: '1rem' }}>
-              <label className="form-label" style={{ color: '#e2e8f0' }}>اسم المستخدم</label>
-              <div style={{ position: 'relative' }}>
-                <i className="pi pi-user" style={{
-                  position: 'absolute', right: '1rem', top: '50%',
-                  transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.95rem'
-                }} />
-                <input
-                  className="form-control"
-                  type="text"
-                  value={manualUsername}
-                  onChange={e => setManualUsername(e.target.value)}
-                  placeholder="مثال: admin أو أحمد_المساعد"
-                  required
-                  autoFocus
-                  style={{
-                    paddingRight: '2.6rem', fontSize: '16px', height: '48px',
-                    borderRadius: '12px', background: 'rgba(255,255,255,0.07)',
-                    borderColor: 'rgba(255,255,255,0.15)', color: '#fff'
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
-              <label className="form-label" style={{ color: '#e2e8f0' }}>كلمة المرور</label>
-              <div style={{ position: 'relative' }}>
-                <i className="pi pi-lock" style={{
-                  position: 'absolute', right: '1rem', top: '50%',
-                  transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '0.95rem'
-                }} />
-                <input
-                  className="form-control"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="ادخل كلمة المرور"
-                  required
-                  style={{
-                    paddingRight: '2.6rem', paddingLeft: '2.6rem', fontSize: '16px',
-                    height: '48px', borderRadius: '12px', background: 'rgba(255,255,255,0.07)',
-                    borderColor: 'rgba(255,255,255,0.15)', color: '#fff'
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute', left: '0.85rem', top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none', border: 'none',
-                    color: '#94a3b8', cursor: 'pointer', fontSize: '1rem'
-                  }}
-                >
-                  <i className={`pi ${showPassword ? 'pi-eye-slash' : 'pi-eye'}`} />
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary w-full"
-              disabled={loading}
-              style={{
-                justifyContent: 'center', padding: '0.9rem',
-                fontSize: '1.02rem', borderRadius: '14px', fontWeight: 700
-              }}
-            >
-              {loading ? <><i className="pi pi-spin pi-spinner" /> جاري الدخول...</> : <><i className="pi pi-sign-in" /> تسجيل الدخول</>}
-            </button>
-          </form>
-        )}
-
-        {/* Toggle between Quick Mode and Manual Mode */}
-        <div style={{ textAlign: 'center', marginTop: '1.1rem' }}>
-          <button
-            type="button"
-            onClick={() => { setIsManualMode(!isManualMode); setSelectedUser(null); setError(''); }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#93c5fd',
-              fontSize: '0.84rem',
-              cursor: 'pointer',
-              textDecoration: 'underline'
-            }}
-          >
-            {isManualMode ? '← العودة لاختيار الحساب السريع' : 'أو كتابة اسم المستخدم يدوياً'}
-          </button>
-        </div>
 
         {/* Quick Connect Scanner for Mobile Phone */}
         <div style={{ marginTop: '1.35rem', paddingTop: '1.15rem', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
