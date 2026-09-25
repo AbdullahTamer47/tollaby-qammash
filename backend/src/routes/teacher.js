@@ -16,6 +16,7 @@ router.get('/dashboard', requireTeacher, async (req, res) => {
       assistants,
       sessionsToday,
       paymentsTodayRecords,
+      expensesTodayRecords,
       logs
     ] = await Promise.all([
       prisma.student.count(),
@@ -24,6 +25,9 @@ router.get('/dashboard', requireTeacher, async (req, res) => {
       prisma.session.count({ where: { date: { gte: startOfDay, lt: endOfDay } } }),
       prisma.eachPayment.findMany({
         where: { lastPaymentDate: { gte: startOfDay, lt: endOfDay } }
+      }),
+      prisma.expense.findMany({
+        where: { date: { gte: startOfDay, lt: endOfDay } }
       }),
       prisma.actionLog.findMany({
         where: {
@@ -38,6 +42,8 @@ router.get('/dashboard', requireTeacher, async (req, res) => {
 
     const paymentsTodayCount = paymentsTodayRecords.length;
     const paymentsTodaySum = paymentsTodayRecords.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const expensesTodaySum = expensesTodayRecords.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const netToday = paymentsTodaySum - expensesTodaySum;
 
     res.json({
       stats: {
@@ -46,7 +52,9 @@ router.get('/dashboard', requireTeacher, async (req, res) => {
         assistantsCount: assistants.length,
         sessionsToday,
         paymentsTodayCount,
-        paymentsTodaySum
+        paymentsTodaySum,
+        expensesTodaySum,
+        netToday
       },
       assistants,
       logs: logs.map(log => ({

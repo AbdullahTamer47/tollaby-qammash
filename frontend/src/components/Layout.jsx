@@ -18,6 +18,7 @@ const MENU_ITEMS = [
 
   { section: 'المالية' },
   { to: '/payments', icon: 'pi pi-wallet', label: 'المدفوعات', perm: 'payments' },
+  { to: '/expenses', icon: 'pi pi-money-bill', label: 'المصروفات العامة', perm: 'payments' },
   { to: '/exams', icon: 'pi pi-pencil', label: 'الامتحانات', perm: 'exams' },
 
   { section: 'أدوات' },

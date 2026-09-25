@@ -200,3 +200,17 @@ model SessionStore {
   data      String
   expiresAt DateTime
 }
+
+// المصروفات العامة (إيجار، كهرباء، مطبوعات، رسوم، صيانة، بوفيه...)
+model Expense {
+  id        Int      @id @default(autoincrement())
+  title     String
+  category  String   @default("other") // "rent" | "electricity" | "prints" | "maintenance" | "hospitality" | "fees" | "salary" | "other"
+  amount    Float    @default(0)
+  date      DateTime @default(now())
+  notes     String?
+  paidBy    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+

@@ -5,6 +5,44 @@ import { Html5QrcodeScanner } from 'html5-qrcode'
 import { exportToCSV } from '../utils/csvExport'
 import Pagination from '../components/Pagination'
 
+// Audio Chime Synthesizer via Web Audio API (Zero latency, works offline)
+function playSuccessBeep() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    if (!AudioContext) return
+    const ctx = new AudioContext()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(880, ctx.currentTime) // A5
+    osc.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.08) // D6
+    gain.gain.setValueAtTime(0.18, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.25)
+  } catch (e) {}
+}
+
+function playErrorBeep() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    if (!AudioContext) return
+    const ctx = new AudioContext()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sawtooth'
+    osc.frequency.setValueAtTime(220, ctx.currentTime)
+    gain.gain.setValueAtTime(0.25, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.35)
+  } catch (e) {}
+}
+
 export default function AttendancePage() {
   const { id } = useParams()
   const [data, setData] = useState(null)
@@ -16,6 +54,7 @@ export default function AttendancePage() {
   const [filterState, setFilterState] = useState('all') // 'all', 'present', 'absent', 'pending'
   const [cameraEnabled, setCameraEnabled] = useState(false)
   const [autoPay, setAutoPay] = useState(false)
+  const [pendingSyncCount, setPendingSyncCount] = useState(0)
   const autoPayRef = useRef(false)
 
   // Sync ref with state to prevent stale closures in camera callback
@@ -27,20 +66,65 @@ export default function AttendancePage() {
   const lastScannedRef = useRef('')
   const lastScanTimeRef = useRef(0)
 
+  // Offline queue helpers
+  const getOfflineQueue = () => {
+    try {
+      return JSON.parse(localStorage.getItem(`attendance_queue_${id}`) || '[]')
+    } catch {
+      return []
+    }
+  }
+
+  const saveOfflineQueue = (queue) => {
+    localStorage.setItem(`attendance_queue_${id}`, JSON.stringify(queue))
+    setPendingSyncCount(queue.length)
+  }
+
+  const syncOfflineQueue = async () => {
+    const queue = getOfflineQueue()
+    if (!queue.length) return
+
+    const remaining = []
+    let anySuccess = false
+    for (const item of queue) {
+      try {
+        await scanAttendance(id, { student_id: item.studentId, autoPay: item.autoPay })
+        anySuccess = true
+      } catch (err) {
+        remaining.push(item)
+      }
+    }
+    saveOfflineQueue(remaining)
+    if (anySuccess) {
+      load(false)
+    }
+  }
+
+  // Auto-sync interval & online listener
+  useEffect(() => {
+    setPendingSyncCount(getOfflineQueue().length)
+    const interval = setInterval(syncOfflineQueue, 5000)
+    window.addEventListener('online', syncOfflineQueue)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('online', syncOfflineQueue)
+    }
+  }, [id])
+
   const load = (showSpinner = false) => {
     if (showSpinner) setLoading(true)
     getSessionAttendance(id).then(r => setData(r.data)).catch(() => {}).finally(() => setLoading(false))
   }
   useEffect(() => load(true), [id])
 
+  // Camera QR Scanner
   useEffect(() => {
     if (cameraEnabled) {
       const scanner = new Html5QrcodeScanner('qr-reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false)
       scannerRef.current = scanner
       scanner.render((decodedText) => {
         const now = Date.now()
-        // Prevent continuous scanning of the same code within 3 seconds
-        if (decodedText !== lastScannedRef.current || now - lastScanTimeRef.current > 3000) {
+        if (decodedText !== lastScannedRef.current || now - lastScanTimeRef.current > 2500) {
           lastScannedRef.current = decodedText
           lastScanTimeRef.current = now
           handleQRScan(decodedText)
@@ -53,27 +137,76 @@ export default function AttendancePage() {
     }
   }, [cameraEnabled])
 
+  // Global Hardware Barcode / QR Scanner Listener (USB / Wireless 2D Gun)
+  useEffect(() => {
+    let buffer = ''
+    let lastKeyTime = Date.now()
+
+    const handleKeyDown = (e) => {
+      // Don't intercept if user is typing in form inputs
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return
+      }
+
+      const currentTime = Date.now()
+      if (currentTime - lastKeyTime > 150) {
+        buffer = ''
+      }
+      lastKeyTime = currentTime
+
+      if (e.key === 'Enter') {
+        const trimmed = buffer.trim()
+        if (trimmed) {
+          e.preventDefault()
+          handleQRScan(trimmed)
+          buffer = ''
+        }
+      } else if (e.key && e.key.length === 1) {
+        buffer += e.key
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [id])
+
   const handleQRScan = async (studentIdStr) => {
+    const cleanId = String(studentIdStr).trim()
+    if (!cleanId) return
+
     try {
-      const r = await scanAttendance(id, { student_id: studentIdStr, autoPay: autoPayRef.current })
+      const r = await scanAttendance(id, { student_id: cleanId, autoPay: autoPayRef.current })
+      playSuccessBeep()
       if (autoPayRef.current) {
         const paid = r.data.auto_paid || 0
         setScanMsg({
           type: 'success',
           text: paid > 0
-            ? `✅ ${r.data.student_name} — ${r.data.group_name} (تم دفع ${paid})`
-            : `✅ ${r.data.student_name} — ${r.data.group_name} (لا يوجد مستحق للدفع)`
+            ? `✅ ${r.data.student_name} — ${r.data.group_name} (تم دفع ${paid} ج.م)`
+            : `✅ ${r.data.student_name} — ${r.data.group_name} (لا يوجد مستحق)`
         })
-        setAutoPay(false) // reset toggle
+        setAutoPay(false)
       } else {
-        setScanMsg({ type: 'success', text: `✅ ${r.data.student_name} — ${r.data.group_name}` })
+        setScanMsg({ type: 'success', text: `✅ تم تسجيل حضور: ${r.data.student_name} — ${r.data.group_name}` })
       }
-
       load(false)
     } catch (err) {
-      setScanMsg({ type: 'error', text: err.response?.data?.message || 'طالب غير موجود' })
+      if (!window.navigator.onLine || !err.response) {
+        // Offline or connection dropped: store in offline queue!
+        const queue = getOfflineQueue()
+        queue.push({ studentId: cleanId, autoPay: autoPayRef.current, timestamp: Date.now() })
+        saveOfflineQueue(queue)
+        playSuccessBeep()
+        setScanMsg({
+          type: 'warning',
+          text: `⚠️ تم حفظ حضور الطالب #${cleanId} محلياً بدون نت — ستتم المزامنة تلقائياً`
+        })
+      } else {
+        playErrorBeep()
+        setScanMsg({ type: 'error', text: err.response?.data?.message || err.response?.data?.error || 'طالب غير موجود أو غير مقيد' })
+      }
     }
-    setTimeout(() => setScanMsg(null), 3000)
+    setTimeout(() => setScanMsg(null), 3500)
   }
 
   const handleManualScan = async (e) => {
@@ -82,9 +215,8 @@ export default function AttendancePage() {
     setScanId('')
   }
 
-  const [currentPage, setCurrentPage] = useState(1);
-  
-  const PER_PAGE = 10;
+  const [currentPage, setCurrentPage] = useState(1)
+  const PER_PAGE = 10
 
   const toggleSelect = (sid) => setSelected(s => { const n = new Set(s); n.has(sid) ? n.delete(sid) : n.add(sid); return n })
   const isPast = data ? Date.now() > new Date(data.session.date).getTime() + (data.session.duration || 2) * 3600000 : false
@@ -96,15 +228,14 @@ export default function AttendancePage() {
     return true
   }) || []
 
-  const paginatedAttendance = filteredAttendance.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+  const paginatedAttendance = filteredAttendance.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE)
 
   const selectAll = () => setSelected(new Set(filteredAttendance.map(a => a.student.id)))
   const clearAll = () => setSelected(new Set())
 
-  // Reset page when filter changes
   useEffect(() => {
-    setCurrentPage(1);
-  }, [filterState]);
+    setCurrentPage(1)
+  }, [filterState])
 
   const bulkAction = async (action) => {
     try {
@@ -140,18 +271,51 @@ export default function AttendancePage() {
   const pendingCount = attendance.filter(a => !a.isAttendant && !isPast).length
 
   return (
-    <div>
-      <div className="page-header">
+    <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '3rem' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 className="page-title">حضور: {session.title}</h1>
           <p className="page-subtitle">
             {session.type === 'lecture' ? `📚 محاضرة صف: ${session.grade}` : session.group?.name} · {new Date(session.date).toLocaleDateString('ar-EG')}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {pendingSyncCount > 0 ? (
+            <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.75rem' }}>
+              <i className="pi pi-spin pi-spinner" /> يوجد {pendingSyncCount} حضور بانتظار المزامنة
+            </span>
+          ) : (
+            <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.45rem 0.75rem' }}>
+              <i className="pi pi-check" /> مزامن بالكامل
+            </span>
+          )}
           <button className="btn btn-secondary" onClick={handleExportCSV}>
             <i className="pi pi-download" /> تصدير CSV
           </button>
+        </div>
+      </div>
+
+      {/* Hardware Scanner & Hotspot status banner */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(16,185,129,0.1), rgba(59,130,246,0.1))',
+        border: '1px solid rgba(16,185,129,0.25)',
+        borderRadius: '12px',
+        padding: '0.75rem 1rem',
+        marginBottom: '1.25rem',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.75rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 8px #10b981' }} />
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-color)' }}>
+            قارئ الـ QR والباركود (USB / ماكينة سلكية أو لاسلكية) جاهز للاستقبال المباشر
+          </span>
+        </div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-color-secondary)' }}>
+          مرر الكود أمام القارئ في أي وقت دون الحاجة للضغط على الفأرة
         </div>
       </div>
 
@@ -188,7 +352,7 @@ export default function AttendancePage() {
           </div>
         )}
         
-        {/* QR Scan Manual */}
+        {/* QR Scan Manual / Hardware USB */}
         <div className="card" style={{ marginBottom: 0 }}>
           <div className="card-header">
             <h2 className="card-title"><i className="pi pi-qrcode" /> إدخال يدوي / قارئ USB</h2>
@@ -196,9 +360,8 @@ export default function AttendancePage() {
           <form onSubmit={handleManualScan} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <input
               className="form-control" style={{ maxWidth: '260px' }}
-              placeholder="رقم الطالب..."
+              placeholder="كود أو رقم الطالب..."
               value={scanId} onChange={e => setScanId(e.target.value)}
-              autoFocus
             />
             <button type="submit" className="btn btn-primary"><i className="pi pi-check" /> تسجيل</button>
           </form>
@@ -207,13 +370,13 @@ export default function AttendancePage() {
         {/* QR Scan Camera */}
         <div className="card" style={{ marginBottom: 0 }}>
           <div className="card-header">
-            <h2 className="card-title"><i className="pi pi-camera" /> كاميرا الموبايل</h2>
+            <h2 className="card-title"><i className="pi pi-camera" /> كاميرا الهاتف (أندرويد / آيفون)</h2>
             <button className={`btn ${cameraEnabled ? 'btn-danger' : 'btn-success'}`} onClick={() => setCameraEnabled(!cameraEnabled)}>
               {cameraEnabled ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}
             </button>
           </div>
           {cameraEnabled && (
-            <div style={{ background: 'var(--surface-ground)', borderRadius: 'var(--border-radius)', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--surface-ground)', borderRadius: 'var(--border-radius)', overflow: 'hidden', padding: '0.5rem' }}>
               <div id="qr-reader" style={{ width: '100%', maxWidth: '300px', margin: '0 auto' }}></div>
             </div>
           )}
@@ -246,57 +409,66 @@ export default function AttendancePage() {
           <button className="btn btn-danger btn-sm" onClick={() => bulkAction('mark_all_absent')}>غياب الكل</button>
         </div>
 
-        <div className="table-container">
-          <table>
+        <div className="table-responsive">
+          <table className="table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
             <thead>
-              <tr>
-                <th style={{ width: '40px' }}></th>
-                <th>الرقم</th>
-                <th>الاسم</th>
-                {session.type === 'lecture' && <th>المجموعة</th>}
-                <th>الخصم</th>
-                <th>الحالة</th>
-                <th>تبديل</th>
+              <tr style={{ background: 'var(--surface-ground, #f8fafc)', borderBottom: '1px solid var(--surface-border)' }}>
+                <th style={{ width: '40px', padding: '0.75rem' }}>
+                  <input type="checkbox" checked={selected.size === filteredAttendance.length && filteredAttendance.length > 0} onChange={e => e.target.checked ? selectAll() : clearAll()} />
+                </th>
+                <th style={{ padding: '0.75rem' }}>كود الطالب</th>
+                <th style={{ padding: '0.75rem' }}>الاسم</th>
+                <th style={{ padding: '0.75rem' }}>المجموعة</th>
+                <th style={{ padding: '0.75rem' }}>الحالة</th>
+                <th style={{ padding: '0.75rem' }}>المبلغ المدفوع</th>
+                <th style={{ padding: '0.75rem', textAlign: 'center' }}>تبديل الحضور</th>
               </tr>
             </thead>
             <tbody>
               {paginatedAttendance.map(a => (
-                <tr key={a.id} style={{ background: selected.has(a.student.id) ? 'var(--surface-hover)' : '' }}>
-                  <td>
+                <tr key={a.student.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                  <td style={{ padding: '0.75rem' }}>
                     <input type="checkbox" checked={selected.has(a.student.id)} onChange={() => toggleSelect(a.student.id)} />
                   </td>
-                  <td><span className="badge badge-info">{a.student.id}</span></td>
-                  <td style={{ fontWeight: 600 }}>{a.student.name}</td>
-                  {session.type === 'lecture' && <td className="text-muted text-sm">{a.student.group?.name || '-'}</td>}
-                  <td className="text-muted text-sm">{a.student.offer ? `${a.student.offer.title} (${a.student.offer.value})` : '-'}</td>
-                  <td>
-                    <span className={`badge badge-${a.isAttendant ? 'success' : (isPast ? 'danger' : 'warning')}`}>
-                      {a.isAttendant ? '✓ حاضر' : (isPast ? '✗ غائب' : '⏳ قيد الانتظار')}
-                    </span>
+                  <td style={{ padding: '0.75rem', fontWeight: 600 }}>#{a.student.id}</td>
+                  <td style={{ padding: '0.75rem', fontWeight: 600 }}>{a.student.name}</td>
+                  <td style={{ padding: '0.75rem' }}>{a.student.group?.name || '-'}</td>
+                  <td style={{ padding: '0.75rem' }}>
+                    {a.isAttendant ? (
+                      <span className="badge badge-success"><i className="pi pi-check" /> حاضر</span>
+                    ) : isPast ? (
+                      <span className="badge badge-danger"><i className="pi pi-times" /> غائب</span>
+                    ) : (
+                      <span className="badge badge-warning">قيد الانتظار</span>
+                    )}
                   </td>
-                  <td>
+                  <td style={{ padding: '0.75rem' }}>
+                    <span style={{ fontWeight: 600 }}>{a.amountPaid || 0} ج.م</span>
+                  </td>
+                  <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                     <button
                       className={`btn btn-sm ${a.isAttendant ? 'btn-danger' : 'btn-success'}`}
                       onClick={() => toggleOne(a.student.id)}
+                      style={{ padding: '0.3rem 0.75rem' }}
                     >
-                      <i className={`pi pi-${a.isAttendant ? 'times' : 'check'}`} />
+                      {a.isAttendant ? 'تسجيل غياب' : 'تسجيل حضور'}
                     </button>
                   </td>
                 </tr>
               ))}
-              {paginatedAttendance.length === 0 && (
-                <tr><td colSpan={session.type === 'lecture' ? 7 : 6} className="text-center text-muted" style={{ padding: '2rem' }}>لا يوجد طلاب مطابقين للفلتر</td></tr>
-              )}
             </tbody>
           </table>
         </div>
 
-        <Pagination 
-          totalItems={filteredAttendance.length} 
-          itemsPerPage={PER_PAGE} 
-          currentPage={currentPage} 
-          onPageChange={setCurrentPage} 
-        />
+        {filteredAttendance.length > PER_PAGE && (
+          <div style={{ padding: '1rem 0', borderTop: '1px solid var(--surface-border)' }}>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(filteredAttendance.length / PER_PAGE)}
+              onPageChange={p => setCurrentPage(p)}
+            />
+          </div>
+        )}
       </div>
     </div>
   )

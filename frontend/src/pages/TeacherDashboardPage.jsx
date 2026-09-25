@@ -57,8 +57,9 @@ export default function TeacherDashboardPage() {
           { label: 'المجموعات', value: stats?.totalGroups, icon: 'pi pi-th-large', cls: 'green' },
           { label: 'المساعدون', value: stats?.assistantsCount, icon: 'pi pi-user', cls: 'purple' },
           { label: 'حصص اليوم', value: stats?.sessionsToday, icon: 'pi pi-calendar', cls: 'orange' },
-          { label: 'دفعات اليوم', value: stats?.paymentsTodayCount, icon: 'pi pi-money-bill', cls: 'teal' },
-          { label: 'إيرادات اليوم', value: `${stats?.paymentsTodaySum?.toLocaleString()} ج`, icon: 'pi pi-chart-line', cls: 'blue' },
+          { label: 'إيرادات اليوم', value: `${(stats?.paymentsTodaySum || 0).toLocaleString()} ج`, icon: 'pi pi-chart-line', cls: 'blue' },
+          { label: 'مصروفات اليوم', value: `${(stats?.expensesTodaySum || 0).toLocaleString()} ج`, icon: 'pi pi-money-bill', cls: 'orange' },
+          { label: 'صافي اليوم', value: `${(stats?.netToday || 0).toLocaleString()} ج`, icon: 'pi pi-wallet', cls: 'green' },
         ].map((s, i) => (
           <div className="stat-card" key={i}>
             <div className={`stat-icon ${s.cls}`}><i className={s.icon} /></div>

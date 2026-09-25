@@ -23,6 +23,8 @@ const QRCodesPage = lazy(() => import('./pages/QRCodesPage'))
 const SearchPage = lazy(() => import('./pages/SearchPage'))
 const AssistantsPage = lazy(() => import('./pages/AssistantsPage'))
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
+const ExpensesPage = lazy(() => import('./pages/ExpensesPage'))
+
 
 
 function ProtectedRoute({ children, teacherOnly = false, permission }) {
@@ -67,6 +69,8 @@ function AppRoutes() {
 
           <Route path="payments" element={<ProtectedRoute permission="payments"><PaymentsPage /></ProtectedRoute>} />
           <Route path="payments/:id/history" element={<ProtectedRoute permission="payments"><PaymentHistoryPage /></ProtectedRoute>} />
+          <Route path="expenses" element={<ProtectedRoute permission="payments"><ExpensesPage /></ProtectedRoute>} />
+
 
           <Route path="exams" element={<ProtectedRoute permission="exams"><ExamsPage /></ProtectedRoute>} />
           <Route path="exams/:id/degrees" element={<ProtectedRoute permission="exams"><ExamDegreesPage /></ProtectedRoute>} />

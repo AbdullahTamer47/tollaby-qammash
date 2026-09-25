@@ -6,6 +6,8 @@ const rateLimit = require('express-rate-limit');
 const { PrismaClient } = require('@prisma/client');
 const compression = require('compression');
 const helmet = require('helmet');
+const os = require('os');
+
 
 const prisma = new PrismaClient();
 const app = express();
@@ -119,10 +121,25 @@ app.use('/api/chat', require('./routes/chat'));
 app.use('/api/teacher', require('./routes/teacher'));
 app.use('/api/assistant', require('./routes/assistant'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/notification-templates', require('./routes/notificationTemplates'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
+app.get('/api/network-info', (req, res) => {
+  const interfaces = os.networkInterfaces();
+  const addresses = [];
+  for (const name of Object.keys(interfaces)) {
+    for (const net of interfaces[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        addresses.push({ interface: name, address: net.address });
+      }
+    }
+  }
+  res.json({ addresses, port: 5173 });
+});
+
 
 // Global Error Handler
 app.use((err, req, res, next) => {

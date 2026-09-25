@@ -1,0 +1,18 @@
+{
+  "short_name": "الأستاذ القماش",
+  "name": "منصة الأستاذ القماش - نظام إدارة الطلاب",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0d1b3e",
+  "theme_color": "#0d6efd",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "lang": "ar",
+  "dir": "rtl"
+}

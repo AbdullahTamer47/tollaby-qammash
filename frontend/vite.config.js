@@ -19,9 +19,10 @@ export default defineConfig({
     }
   },
 
-  // إعدادات التطوير المحلي (Local Development)
+  // إعدادات التطوير المحلي والشبكة الداخلية (Local Network & Hotspot)
   server: {
-    allowedHosts: ['tollaby.vercel.app'],
+    host: '0.0.0.0', // يتيح الاتصال من الموبايل عبر الواي فاي أو الهوتسبوت بدون نت
+    allowedHosts: true,
     port: 5173,
     proxy: {
       '/api': {

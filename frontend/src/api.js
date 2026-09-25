@@ -89,6 +89,14 @@ export const addPayment = (studentId, data) => api.post(`/payments/${studentId}/
 export const getPaymentHistory = (studentId) => api.get(`/payments/${studentId}/history`)
 export const deleteEachPayment = (id) => api.delete(`/payments/each/${id}`)
 
+// Expenses
+export const getExpenses = (params) => api.get('/expenses', { params })
+export const getExpensesSummary = () => api.get('/expenses/summary')
+export const createExpense = (data) => api.post('/expenses', data)
+export const updateExpense = (id, data) => api.put(`/expenses/${id}`, data)
+export const deleteExpense = (id) => api.delete(`/expenses/${id}`)
+
+
 // Exams
 export const getExams = (params) => api.get('/exams', { params })
 export const createExam = (data) => api.post('/exams', data)
@@ -115,6 +123,10 @@ export const deleteOffer = (id) => api.delete(`/offers/${id}`)
 
 // Search
 export const globalSearch = (q) => api.get('/search', { params: { q } })
+
+// Network info for local mobile connection
+export const getNetworkInfo = () => api.get('/network-info')
+
 
 // Chat / WhatsApp
 export const getChatConversations = (params) => api.get('/chat/conversations', { params })
