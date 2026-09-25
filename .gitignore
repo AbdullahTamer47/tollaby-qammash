@@ -16,3 +16,4 @@ backend/prisma/migrations
 frontend/android/.gradle
 frontend/android/build
 frontend/android/app/build
+.vercel
