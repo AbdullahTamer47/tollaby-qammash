@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - qammash
 
 jobs:
   build:
@@ -13,43 +12,34 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
-      - name: Setup Java JDK
-        uses: actions/setup-java@v3
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Frontend Dependencies & Build
+      - name: Install Frontend & Build Web Assets
         run: |
           cd frontend
           npm install
           npm run build
-
-      - name: Setup Capacitor and Android Project
-        run: |
-          cd frontend
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "الأستاذ القماش" "com.qammash.app" --web-dir dist
-          npx cap add android
           npx cap sync android
 
-      - name: Build Debug APK
+      - name: Build Debug APK with Gradle
         run: |
           cd frontend/android
-          ./gradlew assembleDebug
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Qammash-App-Debug.apk
+          name: Qammash-App-Debug
           path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
