@@ -1,0 +1,54 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Frontend Dependencies & Build
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
+      - name: Setup Capacitor and Android Project
+        run: |
+          cd frontend
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "الأستاذ القماش" "com.qammash.app" --web-dir dist
+          npx cap add android
+          npx cap sync android
+
+      - name: Build Debug APK
+        run: |
+          cd frontend/android
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Qammash-App-Debug.apk
+          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
