@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { getStudentDashboard, changeStudentGroup, addPayment, toggleBooking, getStudentArchivedMessages } from '../api'
+import { getStudentDashboard, changeStudentGroup, addPayment, toggleBooking, toggleDelivery, getStudentArchivedMessages } from '../api'
 import StudentReportModal from '../components/StudentReportModal'
 
 export default function StudentDashboardPage() {
@@ -31,15 +31,44 @@ export default function StudentDashboardPage() {
   }
   useEffect(load, [id])
 
+  const openAddPaymentModal = () => {
+    const sessionRem = Math.max(0, Math.round(((data?.payment?.sessionsDue || 0) - (data?.payment?.sessionsPaid || 0)) * 100) / 100)
+    const bookRem = Math.max(0, Math.round(((data?.payment?.bookingsDue || 0) - (data?.payment?.bookingsPaid || 0)) * 100) / 100)
+
+    if (sessionRem > 0) {
+      setPayForm({ amount: String(sessionRem), type: 'sessions' })
+    } else if (bookRem > 0) {
+      setPayForm({ amount: String(bookRem), type: 'book' })
+    } else {
+      setPayForm({ amount: '', type: 'sessions' })
+    }
+    setPayModal(true)
+  }
+
   const handleAddPayment = async (e) => {
     e.preventDefault()
+    const sessionRem = Math.max(0, Math.round(((data?.payment?.sessionsDue || 0) - (data?.payment?.sessionsPaid || 0)) * 100) / 100)
+    const bookRem = Math.max(0, Math.round(((data?.payment?.bookingsDue || 0) - (data?.payment?.bookingsPaid || 0)) * 100) / 100)
+
+    if (payForm.type === 'sessions' && sessionRem <= 0) {
+      setMsg({ type: 'error', text: 'الطالب سدد جميع مستحقات الحصص بالكامل (خالص). لا يمكن إضافة مبالغ حصص زائدة.' })
+      return
+    }
+
+    if (payForm.type === 'book' && bookRem <= 0) {
+      setMsg({ type: 'error', text: 'الطالب لا توجد عليه أي مديونيات لكتب أو مذكرات (خالص).' })
+      return
+    }
+
     try {
       await addPayment(id, payForm)
-      setMsg({ type: 'success', text: `تم إضافة دفعة ${payForm.amount} جنيه` })
+      setMsg({ type: 'success', text: `تم إضافة دفعة ${payForm.amount} جنيه بنجاح` })
       setPayModal(false)
       setPayForm({ amount: '', type: 'sessions' })
       load()
-    } catch { setMsg({ type: 'error', text: 'فشل إضافة الدفعة' }) }
+    } catch (err) {
+      setMsg({ type: 'error', text: err?.response?.data?.error || 'فشل إضافة الدفعة' })
+    }
   }
 
   const handleDeletePayment = async () => {
@@ -70,6 +99,16 @@ export default function StudentDashboardPage() {
       await toggleBooking({ studentId: id, bookId })
       load()
     } catch { setMsg({ type: 'error', text: 'فشل تغيير حجز الكتاب' }) }
+  }
+
+  const handleToggleDelivery = async (bookId) => {
+    try {
+      await toggleDelivery({ studentId: id, bookId })
+      setMsg({ type: 'success', text: 'تم تحديث حالة تسليم المذكرة بنجاح' })
+      load()
+    } catch {
+      setMsg({ type: 'error', text: 'فشل تحديث تسليم المذكرة' })
+    }
   }
 
   const handleApplyBookDiscount = async (e) => {
@@ -129,7 +168,7 @@ export default function StudentDashboardPage() {
           <button className="btn btn-secondary" onClick={() => { setNewGroupId(student.groupId); setGroupModal(true) }}>
             <i className="pi pi-arrow-right-arrow-left" /> تغيير المجموعة
           </button>
-          <button className="btn btn-success" onClick={() => setPayModal(true)}>
+          <button className="btn btn-success" onClick={openAddPaymentModal}>
             <i className="pi pi-plus" /> إضافة دفعة
           </button>
         </div>
@@ -272,33 +311,84 @@ export default function StudentDashboardPage() {
 
         {/* Books info */}
         <div className="card" style={{ gridColumn: '1 / -1' }}>
-          <div className="card-header">
-            <h2 className="card-title"><i className="pi pi-book" /> الكتب المتاحة للصف</h2>
+          <div className="card-header" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <h2 className="card-title"><i className="pi pi-book" /> الكتب والمذكرات الدراسية للدفعة</h2>
+            <span className="badge badge-info" style={{ fontSize: '0.82rem' }}>
+              الكتب المحجوزة: {bookedBookIds?.length || 0}
+            </span>
           </div>
           {availableBooks?.length === 0 ? (
             <div className="empty-state"><i className="pi pi-book" /><p>لا توجد كتب متاحة لصف هذا الطالب</p></div>
           ) : (
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '0.5rem' }}>
               {availableBooks?.map(b => {
                 const isBooked = bookedBookIds?.includes(b.id)
+                const booking = (data.bookBookings || []).find(bb => bb.bookId === b.id)
+                const isDelivered = Boolean(booking?.delivered)
+
                 return (
-                  <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <button 
-                      className={`btn ${isBooked ? 'btn-success' : 'btn-secondary'}`} 
-                      onClick={() => handleToggleBooking(b.id)}
-                    >
-                      <i className={`pi pi-${isBooked ? 'check' : 'times'}`} /> 
-                      {b.title} ({b.price} ج.م)
-                    </button>
-                    {isBooked && (
-                      <button 
-                        className="btn btn-secondary btn-sm" 
-                        title="تخصيص خصم للكتاب"
-                        onClick={() => { setBookDiscountModal(b.id); setBookDiscountForm({ type: 'percentage', value: '' }) }}
+                  <div key={b.id} style={{
+                    background: 'var(--surface-ground)',
+                    border: isDelivered ? '2px solid #10b981' : isBooked ? '1px solid #3b82f6' : '1px solid var(--surface-border)',
+                    borderRadius: '10px',
+                    padding: '0.85rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '0.75rem'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.35rem' }}>
+                        <strong style={{ fontSize: '0.95rem', color: 'var(--text-color)' }}>{b.title}</strong>
+                        <span className="badge badge-info">{b.price} ج.م</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', fontSize: '0.75rem' }}>
+                        <span className={`badge badge-${isBooked ? 'success' : 'secondary'}`}>
+                          {isBooked ? '📌 محجوز' : 'غير محجوز'}
+                        </span>
+                        <span className={`badge badge-${isDelivered ? 'success' : 'warning'}`}>
+                          {isDelivered ? '✅ تم التسليم' : '⏳ لم تُسلّم بعد'}
+                        </span>
+                        {booking?.discountValue > 0 && (
+                          <span className="badge badge-warning">
+                            خصم: {booking.discountValue} {booking.discountType === 'percentage' ? '%' : 'ج'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', borderTop: '1px solid var(--surface-border)', paddingTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${isBooked ? 'btn-secondary' : 'btn-primary'}`}
+                        style={{ flex: 1, minWidth: '90px', fontSize: '0.8rem', padding: '0.35rem 0.5rem' }}
+                        onClick={() => handleToggleBooking(b.id)}
                       >
-                        <i className="pi pi-tag" /> خصم
+                        <i className={`pi pi-${isBooked ? 'times' : 'bookmark'}`} />
+                        {isBooked ? 'إلغاء الحجز' : 'حجز المذكرة'}
                       </button>
-                    )}
+
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${isDelivered ? 'btn-success' : 'btn-warning'}`}
+                        style={{ flex: 1, minWidth: '90px', fontSize: '0.8rem', padding: '0.35rem 0.5rem', fontWeight: 700 }}
+                        onClick={() => handleToggleDelivery(b.id)}
+                        title={isDelivered ? 'اضغط لإلغاء حالة التسليم' : 'اضغط لتسليم المذكرة للطالب فوراً'}
+                      >
+                        <i className={`pi pi-${isDelivered ? 'check-circle' : 'box'}`} />
+                        {isDelivered ? 'مُسلّمة ✅' : 'تسليم المذكرة'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{ fontSize: '0.8rem', padding: '0.35rem 0.6rem' }}
+                        title="تخصيص خصم للكتاب"
+                        onClick={() => { setBookDiscountModal(b.id); setBookDiscountForm({ type: 'percentage', value: booking?.discountValue || '' }) }}
+                      >
+                        <i className="pi pi-tag" />
+                      </button>
+                    </div>
                   </div>
                 )
               })}
@@ -387,34 +477,105 @@ export default function StudentDashboardPage() {
       </div>
 
       {/* Add Payment Modal */}
-      {payModal && (
-        <div className="modal-overlay" onClick={() => { setPayModal(false); setPayForm({ amount: '', type: 'sessions' }) }}>
-          <div className="modal" style={{ maxWidth: '380px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">إضافة دفعة - {student.name}</h3>
-              <button className="modal-close" onClick={() => { setPayModal(false); setPayForm({ amount: '', type: 'sessions' }) }}><i className="pi pi-times" /></button>
-            </div>
-            <form onSubmit={handleAddPayment}>
-              <div className="form-group">
-                <label className="form-label">نوع الدفعة</label>
-                <select className="form-control" value={payForm.type} onChange={e => setPayForm(f => ({ ...f, type: e.target.value }))}>
-                  <option value="sessions">حصص</option>
-                  <option value="book">كتب / مذكرات</option>
-                </select>
+      {payModal && (() => {
+        const sessionRem = Math.max(0, Math.round(((payment?.sessionsDue || 0) - (payment?.sessionsPaid || 0)) * 100) / 100)
+        const bookRem = Math.max(0, Math.round(((payment?.bookingsDue || 0) - (payment?.bookingsPaid || 0)) * 100) / 100)
+        const isCompletelyPaid = sessionRem <= 0 && bookRem <= 0
+
+        return (
+          <div className="modal-overlay" onClick={() => { setPayModal(false); setPayForm({ amount: '', type: 'sessions' }) }}>
+            <div className="modal" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3 className="modal-title"><i className="pi pi-wallet" /> تسجيل دفعة - {student.name}</h3>
+                <button className="modal-close" onClick={() => { setPayModal(false); setPayForm({ amount: '', type: 'sessions' }) }}><i className="pi pi-times" /></button>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">المبلغ (جنيه)</label>
-                <input className="form-control" type="number" min="1" required value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))} />
+              {/* Debt overview card */}
+              <div style={{
+                background: 'var(--surface-ground)',
+                padding: '0.85rem',
+                borderRadius: '8px',
+                border: '1px solid var(--surface-border)',
+                marginBottom: '1rem',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '0.5rem',
+                textAlign: 'center'
+              }}>
+                <div style={{ background: sessionRem > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)', padding: '0.5rem', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-color-secondary)' }}>متبقي الحصص</div>
+                  <div style={{ fontWeight: 800, color: sessionRem > 0 ? '#ef4444' : '#15803d', fontSize: '1.05rem' }}>
+                    {sessionRem > 0 ? `${sessionRem} ج` : 'خالص ✅'}
+                  </div>
+                </div>
+                <div style={{ background: bookRem > 0 ? 'rgba(245, 158, 11, 0.1)' : 'rgba(34, 197, 94, 0.1)', padding: '0.5rem', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-color-secondary)' }}>متبقي المذكرات</div>
+                  <div style={{ fontWeight: 800, color: bookRem > 0 ? '#b45309' : '#15803d', fontSize: '1.05rem' }}>
+                    {bookRem > 0 ? `${bookRem} ج` : 'خالص ✅'}
+                  </div>
+                </div>
               </div>
-              <div className="modal-footer">
-                <button type="submit" className="btn btn-success"><i className="pi pi-check" /> إضافة</button>
-                <button type="button" className="btn btn-secondary" onClick={() => { setPayModal(false); setPayForm({ amount: '', type: 'sessions' }) }}>إلغاء</button>
-              </div>
-            </form>
+
+              {isCompletelyPaid && (
+                <div className="alert alert-info" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
+                  <i className="pi pi-check-circle" />
+                  الطالب خالص تماماً وسدد جميع الحصص والمذكرات المطلوبة حتى الآن.
+                </div>
+              )}
+
+              <form onSubmit={handleAddPayment}>
+                <div className="form-group">
+                  <label className="form-label">نوع الدفعة</label>
+                  <select
+                    className="form-control"
+                    value={payForm.type}
+                    onChange={e => {
+                      const newType = e.target.value
+                      setPayForm({
+                        type: newType,
+                        amount: newType === 'sessions' ? (sessionRem > 0 ? String(sessionRem) : '') : (bookRem > 0 ? String(bookRem) : '')
+                      })
+                    }}
+                  >
+                    <option value="sessions" disabled={sessionRem <= 0}>
+                      سداد حصص {sessionRem <= 0 ? '(خالص بالكامل - 0 ج)' : `(مطلوب: ${sessionRem} ج)`}
+                    </option>
+                    <option value="book" disabled={bookRem <= 0}>
+                      سداد مذكرات / كتب {bookRem <= 0 ? '(خالص بالكامل - 0 ج)' : `(مطلوب: ${bookRem} ج)`}
+                    </option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">المبلغ المدفوع (جنيه)</label>
+                  <input
+                    className="form-control"
+                    type="number"
+                    min="1"
+                    required
+                    placeholder="المبلغ بالجنيه"
+                    disabled={isCompletelyPaid}
+                    value={payForm.amount}
+                    onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))}
+                  />
+                  {payForm.type === 'sessions' && sessionRem > 0 && (
+                    <span className="text-xs text-muted" style={{ display: 'block', marginTop: '0.25rem' }}>
+                      المبلغ المتبقي والمستحق لسداد الحصص هو {sessionRem} جنيه.
+                    </span>
+                  )}
+                </div>
+
+                <div className="modal-footer">
+                  <button type="submit" className="btn btn-success" disabled={isCompletelyPaid}>
+                    <i className="pi pi-check" /> حفظ الدفعة
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setPayModal(false); setPayForm({ amount: '', type: 'sessions' }) }}>إلغاء</button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Delete Payment Confirm */}
       {deletePayModal && (

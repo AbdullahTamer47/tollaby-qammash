@@ -122,6 +122,23 @@ router.post('/:studentId/add', requirePermission('payments'), async (req, res) =
   try {
     const student = await prisma.student.findUnique({ where: { id: studentId }, include: { offer: true } });
     if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    const snapshot = await getStudentPaymentSnapshot(prisma, studentId);
+    const sessionRemaining = Math.max(0, Math.round((snapshot.payment.sessionsDue - snapshot.payment.sessionsPaid) * 100) / 100);
+    const bookRemaining = Math.max(0, Math.round((snapshot.payment.bookingsDue - snapshot.payment.bookingsPaid) * 100) / 100);
+
+    if (type === 'sessions' && sessionRemaining <= 0) {
+      return res.status(400).json({
+        error: 'الطالب مسدد لجميع مستحقات الحصص بالكامل (خالص). لا يمكن إضافة مبالغ حصص إضافية إلا إذا وُجدت كتب أو مذكرات مستحقة.'
+      });
+    }
+
+    if (type === 'book' && bookRemaining <= 0) {
+      return res.status(400).json({
+        error: 'الطالب لا توجد عليه أي مديونيات لكتب أو مذكرات (خالص).'
+      });
+    }
+
     const eachPayment = await prisma.$transaction(async tx => {
       const created = await tx.eachPayment.create({
         data: {

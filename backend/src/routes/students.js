@@ -257,7 +257,8 @@ router.get('/:id/dashboard', requirePermission('students'), async (req, res) => 
       discountAmount: 0,
       finalAmountAfterDiscount: paymentSummary.sessionsDue,
       availableBooks,
-      bookedBookIds
+      bookedBookIds,
+      bookBookings
     });
   } catch (err) {
     console.error("Dashboard error:", err);

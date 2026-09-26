@@ -12,7 +12,7 @@ export default function QRCodesPage() {
   const [students, setStudents] = useState([])
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [fetching, setFetching] = useState(false)
-  const [cardStyle, setCardStyle] = useState('badge') // 'badge' | 'sticker'
+  const [cardStyle, setCardStyle] = useState('sticker') // 'badge' | 'sticker'
   const [showCutLines, setShowCutLines] = useState(true)
   const [printFilter, setPrintFilter] = useState('all') // 'all' | 'unprinted' | 'printed'
   const [printedMap, setPrintedMap] = useState({})
@@ -311,7 +311,7 @@ export default function QRCodesPage() {
             /* Web View Styles */
             .id-cards-grid {
               display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+              grid-template-columns: repeat(auto-fill, minmax(${cardStyle === 'sticker' ? '210px' : '320px'}, 1fr));
               gap: 1.25rem;
             }
             .id-card-wrapper {
@@ -383,23 +383,21 @@ export default function QRCodesPage() {
               border-top: 1px solid rgba(255, 255, 255, 0.08);
             }
 
-            /* Sticker Card Style */
+            /* Sticker Card Style (Baseline original clean dashed sticker) */
             .id-card-sticker {
               background: #ffffff;
-              color: #0f172a;
-              border-radius: 10px;
-              border: 2px solid #0f172a;
-              padding: 0.65rem;
-              display: flex;
-              align-items: center;
-              gap: 0.75rem;
+              color: #000000;
+              border-radius: 8px;
+              border: 2px dashed #000000;
+              padding: 14px 10px;
+              text-align: center;
               cursor: pointer;
               transition: transform 0.2s, box-shadow 0.2s;
               page-break-inside: avoid;
             }
             .id-card-wrapper.is-selected .id-card-sticker {
               border-color: #2563eb;
-              box-shadow: 0 2px 12px rgba(37, 99, 235, 0.25);
+              box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
             }
 
             /* Print Status Tag */
@@ -436,7 +434,7 @@ export default function QRCodesPage() {
               }
               .id-cards-grid {
                 display: grid !important;
-                grid-template-columns: repeat(2, 1fr) !important;
+                grid-template-columns: ${cardStyle === 'sticker' ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)'} !important;
                 gap: 10px !important;
                 width: 100% !important;
                 padding: 0 !important;
@@ -462,11 +460,26 @@ export default function QRCodesPage() {
                 print-color-adjust: exact !important;
               }
               .id-card-sticker {
-                border: ${showCutLines ? '1px dashed #64748b' : '1px solid #000000'} !important;
+                background: #ffffff !important;
+                color: #000000 !important;
+                border: ${showCutLines ? '2px dashed #000000' : '1px solid #000000'} !important;
+                padding: 12px 6px !important;
+                text-align: center !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
+              }
+              .id-card-sticker h3 {
+                font-size: 13px !important;
+                font-weight: 800 !important;
+                margin: 8px 0 4px !important;
+                color: #000000 !important;
+              }
+              .id-card-sticker p {
+                font-size: 11px !important;
+                margin: 2px 0 !important;
+                color: #000000 !important;
               }
             }
           `}</style>
@@ -573,25 +586,25 @@ export default function QRCodesPage() {
                       </div>
                     </div>
                   ) : (
-                    /* Sticker Style */
-                    <div className="id-card-sticker" title="اضغط لتحديد / إلغاء تحديد هذا الملصق">
-                      <div style={{ background: '#f8fafc', padding: '0.35rem', borderRadius: '8px', border: '1px solid #cbd5e1', flexShrink: 0 }}>
-                        <QRCodeSVG value={String(s.id)} size={72} level="M" />
+                    /* Original Sticker Style (ملصقات باركود المذكرات الأساسية) */
+                    <div className="id-card-sticker qr-card" title="اضغط لتحديد / إلغاء تحديد هذا الملصق للطباعة">
+                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+                        <QRCodeSVG value={String(s.id)} size={120} level="M" />
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700, marginBottom: '0.1rem' }}>
-                          الأستاذ محمد القماش
-                        </div>
-                        <div style={{ fontWeight: 800, fontSize: '0.98rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {s.name}
-                        </div>
-                        <div style={{ fontSize: '0.76rem', color: '#475569', marginTop: '0.15rem' }}>
-                          كود: <strong>#{s.id}</strong> | {s.group?.name}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-                          {s.group?.grade} {s.phoneNumber ? `| 📞 ${s.phoneNumber}` : ''}
-                        </div>
-                      </div>
+                      <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '8px 0 4px', color: '#000000' }}>
+                        {s.name}
+                      </h3>
+                      <p style={{ fontSize: '12px', fontWeight: 700, margin: '2px 0', color: '#1e293b' }}>
+                        رقم الطالب: #{s.id}
+                      </p>
+                      <p style={{ fontSize: '12px', margin: '2px 0', color: '#475569' }}>
+                        {s.group?.name || 'مجموعة عامة'}
+                      </p>
+                      {s.phoneNumber && (
+                        <p style={{ fontSize: '10px', margin: '2px 0', color: '#64748b' }}>
+                          هاتف: {s.phoneNumber}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

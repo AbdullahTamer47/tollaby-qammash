@@ -132,10 +132,16 @@ router.get('/bookings', requirePermission('books'), async (req, res) => {
 });
 
 // POST /api/books/bookings/toggle
-router.post('/bookings/toggle', requirePermission('books'), async (req, res) => {
+router.post('/bookings/toggle', (req, res, next) => {
+  const perms = Array.isArray(req.session?.permissions) ? req.session.permissions : [];
+  if (req.session?.role === 'teacher' || perms.includes('books') || perms.includes('students')) {
+    return next();
+  }
+  return res.status(403).json({ error: 'غير مصرح لك للقيام بهذا الإجراء' });
+}, async (req, res) => {
   const prisma = req.app.locals.prisma;
   const { bulk_action, student_id, book_id, selected_students, studentId, bookId } = req.body;
-  const targetBookId = parseInt(book_id || bookId);
+  const targetBookId = parseInt(book_id || bookId || 0);
 
   try {
     await prisma.$transaction(async tx => {
@@ -176,7 +182,7 @@ router.post('/bookings/toggle', requirePermission('books'), async (req, res) => 
           }
         }
       } else {
-        const targetStudentId = parseInt(student_id || studentId);
+        const targetStudentId = parseInt(student_id || studentId || 0);
         const existing = await tx.bookBooking.findUnique({ where: { studentId_bookId: { studentId: targetStudentId, bookId: targetBookId } } });
         if (existing) {
           await tx.bookBooking.delete({ where: { studentId_bookId: { studentId: targetStudentId, bookId: targetBookId } } });
@@ -196,18 +202,44 @@ router.post('/bookings/toggle', requirePermission('books'), async (req, res) => 
 });
 
 // POST /api/books/bookings/deliver
-router.post('/bookings/deliver', requirePermission('books'), async (req, res) => {
+router.post('/bookings/deliver', (req, res, next) => {
+  const perms = Array.isArray(req.session?.permissions) ? req.session.permissions : [];
+  if (req.session?.role === 'teacher' || perms.includes('books') || perms.includes('students')) {
+    return next();
+  }
+  return res.status(403).json({ error: 'غير مصرح لك للقيام بهذا الإجراء' });
+}, async (req, res) => {
   const prisma = req.app.locals.prisma;
-  const { studentId, bookId } = req.body;
+  const { studentId, bookId, student_id, book_id } = req.body;
 
   try {
-    const sId = parseInt(studentId);
-    const bId = parseInt(bookId);
+    const sId = parseInt(studentId || student_id || 0);
+    const bId = parseInt(bookId || book_id || 0);
+    if (!sId || !bId) return res.status(400).json({ error: 'بيانات غير صالحة' });
+
     const booking = await prisma.bookBooking.findUnique({
       where: { studentId_bookId: { studentId: sId, bookId: bId } },
       include: { book: true }
     });
-    if (!booking) return res.status(404).json({ error: 'الحجز غير موجود' });
+
+    if (!booking) {
+      // If not yet booked, book it and deliver immediately!
+      const book = await prisma.book.findUnique({ where: { id: bId } });
+      if (!book) return res.status(404).json({ error: 'الكتاب غير موجود' });
+      const newBooking = await prisma.bookBooking.create({
+        data: {
+          studentId: sId,
+          bookId: bId,
+          quantity: 1,
+          delivered: true,
+          deliveredAt: new Date()
+        },
+        include: { book: true }
+      });
+      await reconcileManyStudents(prisma, [sId]);
+      await logAction(prisma, req, `حجز وتسليم كتاب ${book.title} للطالب`, 'POST');
+      return res.json({ success: true, delivered: true, deliveredAt: newBooking.deliveredAt });
+    }
 
     const newDelivered = !booking.delivered;
     const updated = await prisma.bookBooking.update({
@@ -223,7 +255,13 @@ router.post('/bookings/deliver', requirePermission('books'), async (req, res) =>
 });
 
 // POST /api/books/bookings/discount
-router.post('/bookings/discount', requirePermission('books'), async (req, res) => {
+router.post('/bookings/discount', (req, res, next) => {
+  const perms = Array.isArray(req.session?.permissions) ? req.session.permissions : [];
+  if (req.session?.role === 'teacher' || perms.includes('books') || perms.includes('students')) {
+    return next();
+  }
+  return res.status(403).json({ error: 'غير مصرح لك للقيام بهذا الإجراء' });
+}, async (req, res) => {
   const prisma = req.app.locals.prisma;
   const { studentId, bookId, discountType, discountValue } = req.body;
 

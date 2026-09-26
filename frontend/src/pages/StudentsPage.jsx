@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Html5QrcodeScanner } from 'html5-qrcode'
+import { QRCodeSVG } from 'qrcode.react'
 import { getStudents, deleteStudent, activateStudent, getGroups, getOffers, createStudent, updateStudent } from '../api'
 import { exportToCSV } from '../utils/csvExport'
 import Pagination from '../components/Pagination'
@@ -20,6 +21,7 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true)
   const [reportStudentId, setReportStudentId] = useState(null)
   const [whatsappStudent, setWhatsappStudent] = useState(null)
+  const [viewQrStudent, setViewQrStudent] = useState(null)
   
   // Filters
   const [searchQ, setSearchQ] = useState('')
@@ -279,6 +281,14 @@ export default function StudentsPage() {
                             </button>
                             <button className="btn btn-secondary btn-sm btn-icon" title="لوحة الطالب" onClick={() => navigate(`/students/${s.id}/dashboard`)}>
                               <i className="pi pi-chart-bar" />
+                            </button>
+                            <button
+                              className="btn btn-sm btn-icon"
+                              title="عرض كود QR والباركود للطالب"
+                              style={{ background: 'rgba(168, 85, 247, 0.15)', color: '#9333ea', border: '1px solid rgba(168, 85, 247, 0.3)' }}
+                              onClick={() => setViewQrStudent(s)}
+                            >
+                              <i className="pi pi-qrcode" />
                             </button>
                             <button className="btn btn-secondary btn-sm btn-icon" title="تعديل" onClick={() => openEdit(s)}>
                               <i className="pi pi-pencil" />
@@ -590,6 +600,63 @@ export default function StudentsPage() {
           </div>
         )
       })()}
+
+      {/* Quick QR Code View Modal */}
+      {viewQrStudent && (
+        <div className="modal-overlay" onClick={() => setViewQrStudent(null)}>
+          <div className="modal" style={{ maxWidth: '400px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <i className="pi pi-qrcode" style={{ color: '#9333ea' }} /> كود QR: {viewQrStudent.name}
+              </h3>
+              <button className="modal-close" onClick={() => setViewQrStudent(null)}><i className="pi pi-times" /></button>
+            </div>
+
+            <div style={{ padding: '1.25rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{
+                background: '#ffffff',
+                padding: '1.25rem',
+                borderRadius: '12px',
+                border: '2px dashed #000000',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                display: 'inline-block'
+              }}>
+                <QRCodeSVG value={String(viewQrStudent.id)} size={180} level="M" />
+              </div>
+
+              <div style={{ marginTop: '0.5rem' }}>
+                <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--text-color)' }}>{viewQrStudent.name}</div>
+                <div style={{ display: 'inline-block', background: 'rgba(59, 130, 246, 0.15)', color: '#2563eb', padding: '0.2rem 0.6rem', borderRadius: '6px', fontWeight: 700, margin: '0.4rem 0' }}>
+                  كود الطالب: #{viewQrStudent.id}
+                </div>
+                <div style={{ fontSize: '0.9rem', color: 'var(--text-color-secondary)' }}>
+                  {viewQrStudent.group?.name || 'مجموعة عامة'} ({viewQrStudent.group?.grade || 'المرحلة الدراسية'})
+                </div>
+                {viewQrStudent.phoneNumber && (
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-color-secondary)', marginTop: '0.25rem' }}>
+                    هاتف: {viewQrStudent.phoneNumber}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  const sid = viewQrStudent.id
+                  setViewQrStudent(null)
+                  navigate(`/qrcodes?student_id=${sid}`)
+                }}
+              >
+                <i className="pi pi-print" /> فتح صفحة الطباعة
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setViewQrStudent(null)}>إغلاق</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
