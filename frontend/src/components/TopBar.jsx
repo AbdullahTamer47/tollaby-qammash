@@ -2,11 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { getNetworkInfo } from '../api'
+import SmartCameraModal from './SmartCameraModal'
 
 export default function TopBar({ user, onMenuToggle }) {
   const [searchQ, setSearchQ] = useState('')
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true)
   const [showConnectModal, setShowConnectModal] = useState(false)
+  const [cameraModalMode, setCameraModalMode] = useState(null) // null | 'live_attendance' | 'search_lookup'
   const isCloudHost = typeof window !== 'undefined' && (
     window.location.hostname.includes('vercel.app') ||
     window.location.protocol === 'https:'
@@ -120,6 +122,41 @@ export default function TopBar({ user, onMenuToggle }) {
       </form>
 
       <div className="topbar-right">
+        {/* Camera 1: Live Attendance & Fast Pay */}
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() => setCameraModalMode('live_attendance')}
+          title="كاميرا تسجيل حضور الحصة الجارية مع دفع تلقائي وسريع"
+          style={{
+            background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+            color: '#ffffff',
+            fontWeight: 700,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            padding: '0.35rem 0.75rem',
+            fontSize: '0.82rem',
+            border: 'none',
+            boxShadow: '0 2px 6px rgba(16, 185, 129, 0.3)'
+          }}
+        >
+          <i className="pi pi-camera" />
+          <span>حضور الحصة</span>
+        </button>
+
+        {/* Camera 2: QR Search Lookup */}
+        <button
+          type="button"
+          className="btn btn-sm btn-secondary"
+          onClick={() => setCameraModalMode('search_lookup')}
+          title="مسح كود QR للبحث عن الطالب وفتح بروفايله مباشرة"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}
+        >
+          <i className="pi pi-qrcode" style={{ color: 'var(--primary-color)' }} />
+          <span>بحث QR</span>
+        </button>
+
         <button
           className="btn btn-sm btn-secondary"
           onClick={openConnectModal}
@@ -337,6 +374,14 @@ export default function TopBar({ user, onMenuToggle }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Smart Camera Modal (Live Attendance or QR Search) */}
+      {cameraModalMode && (
+        <SmartCameraModal
+          mode={cameraModalMode}
+          onClose={() => setCameraModalMode(null)}
+        />
       )}
     </header>
   )

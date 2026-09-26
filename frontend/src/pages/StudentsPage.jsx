@@ -19,6 +19,7 @@ export default function StudentsPage() {
   const [state, setState] = useState({ students: [], total: 0, page: 1 })
   const [loading, setLoading] = useState(true)
   const [reportStudentId, setReportStudentId] = useState(null)
+  const [whatsappStudent, setWhatsappStudent] = useState(null)
   
   // Filters
   const [searchQ, setSearchQ] = useState('')
@@ -283,11 +284,12 @@ export default function StudentsPage() {
                               <i className="pi pi-pencil" />
                             </button>
                             <button
-                              className={`btn btn-sm btn-icon ${s.active ? 'btn-warning' : 'btn-success'}`}
-                              title={s.active ? 'تعطيل' : 'تفعيل'}
-                              onClick={() => handleActivate(s)}
+                              className="btn btn-sm btn-icon"
+                              title="تواصل واتساب (ولي الأمر / الطالب)"
+                              style={{ background: '#25D366', color: '#ffffff', border: '1px solid #1ebe5d' }}
+                              onClick={() => setWhatsappStudent(s)}
                             >
-                              <i className={`pi pi-${s.active ? 'ban' : 'check'}`} />
+                              <i className="pi pi-whatsapp" />
                             </button>
                             <button className="btn btn-danger btn-sm btn-icon" title="حذف" onClick={() => { setEditingStudent(s); setModal('delete') }}>
                               <i className="pi pi-trash" />
@@ -369,6 +371,17 @@ export default function StudentsPage() {
                     <option value="">-- اختر المجموعة --</option>
                     {groups.map(g => <option key={g.id} value={g.id}>{g.name} ({g.grade})</option>)}
                   </select>
+                  {modal === 'edit' && (() => {
+                    const targetGroup = groups.find(g => g.id === form.groupId)
+                    const isGradeDiff = Boolean(editingStudent && targetGroup && editingStudent.group?.grade && targetGroup.grade !== editingStudent.group.grade)
+                    if (!isGradeDiff) return null
+                    return (
+                      <div className="alert alert-warning" style={{ marginTop: '0.5rem', marginBottom: '0.25rem', padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}>
+                        <i className="pi pi-exclamation-triangle" style={{ color: '#d97706', marginLeft: '0.4rem' }} />
+                        <strong>تحذير:</strong> الطالب حالياً في ({editingStudent.group?.grade}) بينما المجموعة المختارة تابعة لـ ({targetGroup.grade}).
+                      </div>
+                    )
+                  })()}
                 </div>
                 <div className="form-group">
                   <label className="form-label">الخصم / العرض</label>
@@ -482,6 +495,101 @@ export default function StudentsPage() {
           onClose={() => setReportStudentId(null)}
         />
       )}
+
+      {/* WhatsApp Quick Communication Modal */}
+      {whatsappStudent && (() => {
+        const cleanPhone = (p) => (p || '').replace(/\D/g, '').replace(/^0+/, '')
+        const dadWa = cleanPhone(whatsappStudent.dadPhoneNumber)
+        const studentWa = cleanPhone(whatsappStudent.phoneNumber)
+
+        return (
+          <div className="modal-overlay" onClick={() => setWhatsappStudent(null)}>
+            <div className="modal" style={{ maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ borderBottom: '1px solid #25D366' }}>
+                <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#15803d' }}>
+                  <i className="pi pi-whatsapp" style={{ fontSize: '1.3rem' }} /> تواصل واتساب: {whatsappStudent.name}
+                </h3>
+                <button className="modal-close" onClick={() => setWhatsappStudent(null)}><i className="pi pi-times" /></button>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', margin: '1rem 0' }}>
+                {/* Parent WhatsApp */}
+                <div style={{ background: 'var(--surface-ground)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--surface-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-color)' }}>
+                      👨‍💼 ولي الأمر (الأب / الأم)
+                    </span>
+                    <span className="badge badge-info">{whatsappStudent.dadPhoneNumber || 'لا يوجد رقم'}</span>
+                  </div>
+                  {dadWa ? (
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <a
+                        href={`https://wa.me/20${dadWa}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn btn-sm"
+                        style={{ background: '#25D366', color: '#ffffff', textDecoration: 'none', fontWeight: 600 }}
+                      >
+                        <i className="pi pi-whatsapp" /> فتح محادثة ولي الأمر
+                      </a>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        onClick={() => {
+                          const sid = whatsappStudent.id
+                          setWhatsappStudent(null)
+                          setReportStudentId(sid)
+                        }}
+                      >
+                        <i className="pi pi-file-pdf" /> إرسال تقرير شامل
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-muted text-sm">لم يتم تسجيل رقم ولي الأمر لهذا الطالب</span>
+                  )}
+                </div>
+
+                {/* Student WhatsApp */}
+                <div style={{ background: 'var(--surface-ground)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--surface-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-color)' }}>
+                      🎓 الطالب مباشرة
+                    </span>
+                    <span className="badge badge-info">{whatsappStudent.phoneNumber || 'لا يوجد رقم'}</span>
+                  </div>
+                  {studentWa ? (
+                    <a
+                      href={`https://wa.me/20${studentWa}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-sm"
+                      style={{ background: '#128C7E', color: '#ffffff', textDecoration: 'none', fontWeight: 600 }}
+                    >
+                      <i className="pi pi-whatsapp" /> فتح محادثة الطالب
+                    </a>
+                  ) : (
+                    <span className="text-muted text-sm">لم يتم تسجيل رقم خاص بالطالب</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${whatsappStudent.active ? 'btn-warning' : 'btn-success'}`}
+                  onClick={() => {
+                    handleActivate(whatsappStudent)
+                    setWhatsappStudent(null)
+                  }}
+                >
+                  <i className={`pi pi-${whatsappStudent.active ? 'ban' : 'check'}`} /> {whatsappStudent.active ? 'تعطيل الحساب' : 'تفعيل الحساب'}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setWhatsappStudent(null)}>إغلاق</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

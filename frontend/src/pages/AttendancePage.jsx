@@ -4,6 +4,7 @@ import { getSessionAttendance, editSessionAttendance, scanAttendance } from '../
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { exportToCSV } from '../utils/csvExport'
 import Pagination from '../components/Pagination'
+import SessionWhatsAppModal from '../components/SessionWhatsAppModal'
 
 // Audio Chime Synthesizer via Web Audio API (Zero latency, works offline)
 function playSuccessBeep() {
@@ -55,6 +56,7 @@ export default function AttendancePage() {
   const [cameraEnabled, setCameraEnabled] = useState(false)
   const [autoPay, setAutoPay] = useState(false)
   const [pendingSyncCount, setPendingSyncCount] = useState(0)
+  const [showWhatsAppCenter, setShowWhatsAppCenter] = useState(false)
   const autoPayRef = useRef(false)
 
   // Sync ref with state to prevent stale closures in camera callback
@@ -312,6 +314,14 @@ export default function AttendancePage() {
               <i className="pi pi-check" /> مزامن بالكامل
             </span>
           )}
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ background: '#25D366', color: '#ffffff', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.45rem 0.85rem' }}
+            onClick={() => setShowWhatsAppCenter(true)}
+          >
+            <i className="pi pi-whatsapp" style={{ fontSize: '1.1rem' }} /> تنبيهات واتساب (الغائبين / المتأخرين)
+          </button>
           <button className="btn btn-secondary" onClick={handleExportCSV}>
             <i className="pi pi-download" /> تصدير CSV
           </button>
@@ -545,6 +555,15 @@ export default function AttendancePage() {
           </div>
         )}
       </div>
+
+      {/* Session WhatsApp Bulk Dispatcher Modal */}
+      {showWhatsAppCenter && (
+        <SessionWhatsAppModal
+          session={session}
+          attendance={attendance}
+          onClose={() => setShowWhatsAppCenter(false)}
+        />
+      )}
     </div>
   )
 }

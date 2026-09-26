@@ -113,8 +113,8 @@ export const deleteGroup = (id) => api.delete(`/groups/${id}`)
 export const getGroupStudents = (id) => api.get(`/groups/${id}/students`)
 
 // --- Chat Archive ---
-export const getArchivedMessages = async () => (await api.get('/chat/archived')).data
-export const getStudentArchivedMessages = async (studentId) => (await api.get(`/chat/archived/${studentId}`)).data
+export const getArchivedMessages = async () => (await api.get('/chat/archived', { skipGlobalError: true })).data
+export const getStudentArchivedMessages = async (studentId) => (await api.get(`/chat/archived/${studentId}`, { skipGlobalError: true })).data
 export const deleteArchivedMessage = (id) => api.delete(`/chat/archived/${id}`)
 export const deleteAllArchivedMessages = () => api.delete('/chat/archived')
 

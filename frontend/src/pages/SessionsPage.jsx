@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo, memo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSessions, createSession, updateSession, deleteSession, toggleSessionActive,
-         bulkCreateSessions, deleteMonthSessions, deleteMonthLectures, getGroups, notifySession } from '../api'
+         bulkCreateSessions, deleteMonthSessions, deleteMonthLectures, getGroups, notifySession, getSessionAttendance } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { exportToCSV } from '../utils/csvExport'
 import Pagination from '../components/Pagination'
+import SessionWhatsAppModal from '../components/SessionWhatsAppModal'
 
 const MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
 const DAYS_AR = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت']
@@ -43,6 +44,7 @@ export default function SessionsPage() {
   const [notifyModal, setNotifyModal] = useState(null)
   const [notifyResult, setNotifyResult] = useState(null)
   const [notifySending, setNotifySending] = useState(false)
+  const [sessionWhatsAppTarget, setSessionWhatsAppTarget] = useState(null)
   const [currentPage, setCurrentPage] = useState(1);
 
   const PER_PAGE = 10;
@@ -228,9 +230,26 @@ export default function SessionsPage() {
                                 <div className="text-muted text-sm">{new Date(s.date).toLocaleDateString('ar-EG')} · {s.price} جنيه</div>
                                 <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.75rem' }}>
                                    {canUseAttendance && (
-                                     <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/sessions/${s.id}/attendance`)}>
-                                       <i className="pi pi-users" />
-                                     </button>
+                                     <>
+                                       <button className="btn btn-secondary btn-sm" title="تسجيل الحضور" onClick={() => navigate(`/sessions/${s.id}/attendance`)}>
+                                         <i className="pi pi-users" />
+                                       </button>
+                                       <button
+                                         className="btn btn-sm"
+                                         title="واتساب أولياء أمور الغائبين والمتأخرين بالدفع"
+                                         style={{ background: '#25D366', color: '#ffffff', border: '1px solid #1ebe5d', padding: '0.25rem 0.5rem' }}
+                                         onClick={async () => {
+                                           try {
+                                             const res = await getSessionAttendance(s.id)
+                                             setSessionWhatsAppTarget({ session: s, attendance: res.data?.attendance || [] })
+                                           } catch {
+                                             alert('فشل جلب بيانات حضور الحصة')
+                                           }
+                                         }}
+                                       >
+                                         <i className="pi pi-whatsapp" />
+                                       </button>
+                                     </>
                                    )}
                                   <button className="btn btn-secondary btn-sm" onClick={() => { setEditing(s); setForm({ groupId: s.groupId || '', grade: s.grade || '', title: s.title, type: s.type || 'session', description: s.description || '', location: s.location || '', duration: s.duration, price: s.price, date: s.date?.slice(0,16), active: s.active }); setModal('form') }}>
                                     <i className="pi pi-pencil" />
@@ -565,6 +584,15 @@ export default function SessionsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Session WhatsApp Bulk Dispatcher */}
+      {sessionWhatsAppTarget && (
+        <SessionWhatsAppModal
+          session={sessionWhatsAppTarget.session}
+          attendance={sessionWhatsAppTarget.attendance}
+          onClose={() => setSessionWhatsAppTarget(null)}
+        />
       )}
     </div>
   )

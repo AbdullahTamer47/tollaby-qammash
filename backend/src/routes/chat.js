@@ -93,7 +93,13 @@ router.get('/archived', requirePermission('chat'), async (req, res) => {
 });
 
 // GET /api/chat/archived/:studentId - list specific archived messages for a student
-router.get('/archived/:studentId', requirePermission('chat'), async (req, res) => {
+router.get('/archived/:studentId', (req, res, next) => {
+  const perms = Array.isArray(req.session?.permissions) ? req.session.permissions : [];
+  if (req.session?.role === 'teacher' || perms.includes('chat') || perms.includes('students')) {
+    return next();
+  }
+  return res.status(403).json({ error: 'غير مصرح لك للقيام بهذا الإجراء' });
+}, async (req, res) => {
   const prisma = req.app.locals.prisma;
   const studentId = parseInt(req.params.studentId);
   try {

@@ -434,28 +434,59 @@ export default function StudentDashboardPage() {
       )}
 
       {/* Change Group Modal */}
-      {groupModal && (
-        <div className="modal-overlay" onClick={() => setGroupModal(false)}>
-          <div className="modal" style={{ maxWidth: '380px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">تغيير المجموعة</h3>
-              <button className="modal-close" onClick={() => setGroupModal(false)}><i className="pi pi-times" /></button>
+      {groupModal && (() => {
+        const targetGroup = allGroups.find(g => String(g.id) === String(newGroupId))
+        const isGradeDifferent = Boolean(targetGroup && student?.group?.grade && targetGroup.grade !== student.group.grade)
+
+        return (
+          <div className="modal-overlay" onClick={() => setGroupModal(false)}>
+            <div className="modal" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3 className="modal-title"><i className="pi pi-arrows-h" /> نقل / تغيير المجموعة</h3>
+                <button className="modal-close" onClick={() => setGroupModal(false)}><i className="pi pi-times" /></button>
+              </div>
+              <form onSubmit={handleChangeGroup}>
+                <div style={{ marginBottom: '1rem', background: 'var(--surface-ground)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-border)' }}>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-color-secondary)' }}>المجموعة الحالية:</div>
+                  <div style={{ fontWeight: 700, color: 'var(--primary-color)' }}>
+                    {student?.group?.name} <span className="badge badge-info">{student?.group?.grade}</span>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">اختر المجموعة الجديدة</label>
+                  <select className="form-control" value={newGroupId} onChange={e => setNewGroupId(e.target.value)} required>
+                    {allGroups.map(g => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} ({g.grade}) {g.id === student?.groupId ? '— (الحالية)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {isGradeDifferent && (
+                  <div className="alert alert-warning" style={{ margin: '1rem 0', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                    <i className="pi pi-exclamation-triangle" style={{ fontSize: '1.4rem', color: '#d97706', marginTop: '0.15rem' }} />
+                    <div style={{ fontSize: '0.85rem', lineHeight: '1.4' }}>
+                      <strong style={{ color: '#b45309' }}>تحذير: اختلاف الصف الدراسي!</strong>
+                      <div>
+                        الطالب حالياً في <strong>({student.group.grade})</strong> بينما المجموعة الجديدة مخصصة لـ <strong>({targetGroup.grade})</strong>.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="modal-footer">
+                  <button type="submit" className="btn btn-primary">
+                    <i className="pi pi-check" /> تأكيد النقل
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setGroupModal(false)}>إلغاء</button>
+                </div>
+              </form>
             </div>
-            <form onSubmit={handleChangeGroup}>
-              <div className="form-group">
-                <label className="form-label">المجموعة الجديدة</label>
-                <select className="form-control" value={newGroupId} onChange={e => setNewGroupId(e.target.value)}>
-                  {allGroups.map(g => <option key={g.id} value={g.id}>{g.name} ({g.grade})</option>)}
-                </select>
-              </div>
-              <div className="modal-footer">
-                <button type="submit" className="btn btn-primary"><i className="pi pi-check" /> تغيير</button>
-                <button type="button" className="btn btn-secondary" onClick={() => setGroupModal(false)}>إلغاء</button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Book Discount Modal */}
       {bookDiscountModal && (

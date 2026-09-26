@@ -15,6 +15,7 @@ export default function PaymentsPage() {
 
   const [searchQ, setSearchQ] = useState('')
   const [filterGroupId, setFilterGroupId] = useState('')
+  const [debtFilter, setDebtFilter] = useState('all') // 'all' | 'debtors' | 'paid'
 
   const PER_PAGE = 10;
 
@@ -40,7 +41,7 @@ export default function PaymentsPage() {
     if (!paymentModal) return
     try {
       await addPayment(paymentModal.studentId, paymentForm)
-      setMsg({ type: 'success', text: 'تمت إضافة الدفعة بنجاح وتوزيعها تلقائياً' })
+      setMsg({ type: 'success', text: `تم تسجيل دفعة بقيمة ${paymentForm.amount} جنيه بنجاح` })
       setPaymentModal(null)
       load(state.page)
     } catch {
@@ -51,37 +52,72 @@ export default function PaymentsPage() {
   const handleCSV = async () => {
     getPayments({ q: searchQ, groupId: filterGroupId, per_page: 10000 }).then(r => {
       const columns = [
-        { header: 'رقم الطالب', key: 'studentId' },
+        { header: 'كود الطالب', key: 'studentId' },
         { header: 'اسم الطالب', key: 'student.name' },
         { header: 'المجموعة', key: 'student.group.name' },
         { header: 'المستحق (حصص)', render: p => (p.sessionsDue || 0).toFixed(2) },
         { header: 'المستحق (كتب)', render: p => (p.bookingsDue || 0).toFixed(2) },
-        { header: 'المستحق الكلي', render: p => (p.amountDue || 0).toFixed(2) },
-        { header: 'المدفوع الكلي', render: p => (p.amountPaid || 0).toFixed(2) },
-        { header: 'المتبقي (حصص)', render: p => Math.max(0, (p.sessionsDue || 0) - (p.sessionsPaid || 0)).toFixed(2) },
-        { header: 'المتبقي (كتب)', render: p => Math.max(0, (p.bookingsDue || 0) - (p.bookingsPaid || 0)).toFixed(2) },
-        { header: 'المتبقي الكلي الحقيقي', render: p =>
-          (Math.max(0, (p.sessionsDue || 0) - (p.sessionsPaid || 0)) + Math.max(0, (p.bookingsDue || 0) - (p.bookingsPaid || 0))).toFixed(2)
-        },
-        { header: 'رصيد فايض (حصص)', render: p => Math.max(0, p.sessionsBalance || 0).toFixed(2) },
-        { header: 'رصيد فايض (كتب)', render: p => Math.max(0, p.bookingsBalance || 0).toFixed(2) },
+        { header: 'إجمالي المستحق', render: p => (p.amountDue || 0).toFixed(2) },
+        { header: 'إجمالي المسدد', render: p => (p.amountPaid || 0).toFixed(2) },
+        { header: 'المتبقي (مديونية)', render: p => {
+          const rem = Math.max(0, (p.sessionsDue || 0) - (p.sessionsPaid || 0)) + Math.max(0, (p.bookingsDue || 0) - (p.bookingsPaid || 0))
+          return rem.toFixed(2)
+        }},
         { header: 'آخر دفعة', key: 'lastPayment' }
       ]
-      exportToCSV(r.data.payments, columns, 'payments_export')
+      exportToCSV(r.data.payments, columns, 'tollaby_payments')
     }).catch(() => setMsg({ type: 'error', text: 'فشل تصدير البيانات' }))
   }
+
+  const cleanPhone = (p) => (p || '').replace(/\D/g, '').replace(/^0+/, '')
+
+  const sendWhatsAppDebtReminder = (p, totalRemaining) => {
+    const dadPhone = p.student?.dadPhoneNumber || p.student?.phoneNumber
+    const clean = cleanPhone(dadPhone)
+    if (!clean) {
+      alert('لا يوجد رقم هاتف مسجل لولي الأمر أو الطالب')
+      return
+    }
+
+    const text = `السلام عليكم ورحمة الله وبركاته،\nنود إحاطتكم علماً بأن الطالب (${p.student?.name}) متبقي عليه مستحقات بمبلغ (${totalRemaining.toFixed(2)}) جنيه في منصة الأستاذ محمد القماش.\nيرجى التكرم بالسداد في الحصة القادمة.\nشاكرين ومقدرين حسن تعاونكم.`
+    window.open(`https://wa.me/20${clean}?text=${encodeURIComponent(text)}`, '_blank')
+  }
+
+  // Filter payments by debt status in the current page
+  const filteredPayments = state.payments.filter(p => {
+    const sessionsRemaining = Math.max(0, (p.sessionsDue || 0) - (p.sessionsPaid || 0))
+    const bookingsRemaining = Math.max(0, (p.bookingsDue || 0) - (p.bookingsPaid || 0))
+    const totalRemaining = sessionsRemaining + bookingsRemaining
+
+    if (debtFilter === 'debtors') return totalRemaining > 0
+    if (debtFilter === 'paid') return totalRemaining === 0
+    return true
+  })
+
+  // Quick summary stats for the current loaded view
+  const totalDueSum = state.payments.reduce((acc, p) => acc + (p.amountDue || 0), 0)
+  const totalPaidSum = state.payments.reduce((acc, p) => acc + (p.amountPaid || 0), 0)
+  const totalDebtSum = state.payments.reduce((acc, p) => {
+    const rem = Math.max(0, (p.sessionsDue || 0) - (p.sessionsPaid || 0)) + Math.max(0, (p.bookingsDue || 0) - (p.bookingsPaid || 0))
+    return acc + rem
+  }, 0)
+  const debtorsCount = state.payments.filter(p => {
+    const rem = Math.max(0, (p.sessionsDue || 0) - (p.sessionsPaid || 0)) + Math.max(0, (p.bookingsDue || 0) - (p.bookingsPaid || 0))
+    return rem > 0
+  }).length
 
   const totalPages = Math.ceil(state.total / PER_PAGE)
 
   return (
     <div>
+      {/* Page Header */}
       <div className="page-header">
         <div>
-          <h1 className="page-title">المدفوعات</h1>
-          <p className="page-subtitle">إجمالي: {state.total} سجل</p>
+          <h1 className="page-title">المدفوعات والمستحقات</h1>
+          <p className="page-subtitle">إدارة تحصيلات الحصص والكتب وتتبع مديونيات الطلاب بسهولة</p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={handleCSV}><i className="pi pi-download" /> تحميل CSV</button>
+          <button className="btn btn-secondary" onClick={handleCSV}><i className="pi pi-download" /> تصدير CSV</button>
         </div>
       </div>
 
@@ -92,140 +128,266 @@ export default function PaymentsPage() {
         </div>
       )}
 
+      {/* KPI Financial Overview Cards */}
+      <div className="stats-grid" style={{ marginBottom: '1.25rem' }}>
+        <div className="stat-card">
+          <div className="stat-icon blue"><i className="pi pi-dollar" /></div>
+          <div>
+            <div className="stat-value">{totalDueSum.toFixed(0)} <span style={{ fontSize: '0.8rem' }}>ج</span></div>
+            <div className="stat-label">إجمالي المطلوب</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon green"><i className="pi pi-check-circle" /></div>
+          <div>
+            <div className="stat-value" style={{ color: '#10b981' }}>{totalPaidSum.toFixed(0)} <span style={{ fontSize: '0.8rem' }}>ج</span></div>
+            <div className="stat-label">المحصل الفعلي</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon orange"><i className="pi pi-exclamation-triangle" /></div>
+          <div>
+            <div className="stat-value" style={{ color: '#ef4444' }}>{totalDebtSum.toFixed(0)} <span style={{ fontSize: '0.8rem' }}>ج</span></div>
+            <div className="stat-label">إجمالي المتبقي (مديونيات)</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon purple"><i className="pi pi-users" /></div>
+          <div>
+            <div className="stat-value">{debtorsCount}</div>
+            <div className="stat-label">طلاب عليهم متبقي</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Table Card */}
       <div className="card">
-        <div className="card-header">
-          <h2 className="card-title"><i className="pi pi-wallet" /> قائمة المدفوعات</h2>
+        <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <h2 className="card-title" style={{ margin: 0 }}><i className="pi pi-wallet" /> جدول السداد</h2>
+            
+            {/* Quick Filter Tabs */}
+            <div style={{ display: 'flex', background: 'var(--surface-ground)', borderRadius: '8px', padding: '0.2rem', border: '1px solid var(--surface-border)' }}>
+              <button
+                type="button"
+                className={`btn btn-sm ${debtFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ fontSize: '0.8rem', padding: '0.25rem 0.65rem' }}
+                onClick={() => setDebtFilter('all')}
+              >
+                الكل
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${debtFilter === 'debtors' ? 'btn-danger' : 'btn-secondary'}`}
+                style={{ fontSize: '0.8rem', padding: '0.25rem 0.65rem', fontWeight: debtFilter === 'debtors' ? 'bold' : 'normal' }}
+                onClick={() => setDebtFilter('debtors')}
+              >
+                ⚠️ عليهم متبقي فقط
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${debtFilter === 'paid' ? 'btn-success' : 'btn-secondary'}`}
+                style={{ fontSize: '0.8rem', padding: '0.25rem 0.65rem' }}
+                onClick={() => setDebtFilter('paid')}
+              >
+                ✅ خالصين تماماً
+              </button>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <input className="form-control" style={{ width: '220px' }} placeholder="بحث برقم أو اسم الطالب..." value={searchQ} onChange={e => setSearchQ(e.target.value)} />
-            <select className="form-control" style={{ width: '200px' }} value={filterGroupId} onChange={e => setFilterGroupId(e.target.value)}>
-              <option value="">-- جميع المجموعات --</option>
+            <input
+              className="form-control"
+              style={{ width: '220px' }}
+              placeholder="بحث باسم أو رقم الطالب..."
+              value={searchQ}
+              onChange={e => setSearchQ(e.target.value)}
+            />
+            <select
+              className="form-control"
+              style={{ width: '200px' }}
+              value={filterGroupId}
+              onChange={e => setFilterGroupId(e.target.value)}
+            >
+              <option value="">-- كل المجموعات --</option>
               {groups.map(g => <option key={g.id} value={g.id}>{g.name} ({g.grade})</option>)}
             </select>
           </div>
         </div>
-        {loading ? <div className="spinner-wrapper"><div className="spinner" /></div>
-          : state.payments.length === 0
-            ? <div className="empty-state"><i className="pi pi-wallet" /><p>لا توجد سجلات مدفوعات</p></div>
-            : (
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>الطالب</th>
-                      <th>المجموعة / الصف</th>
-                      <th>المستحق</th>
-                      <th>المدفوع</th>
-                      <th>المتبقي</th>
-                      <th>آخر دفعة</th>
-                      <th>إجراءات</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {state.payments.map(p => {
-                      // متبقي كل نوع لوحده، منها الرقم الحقيقي مش المطروح من إجمالي مختلط
-                      const sessionsRemaining = Math.max(0, (p.sessionsDue || 0) - (p.sessionsPaid || 0))
-                      const bookingsRemaining = Math.max(0, (p.bookingsDue || 0) - (p.bookingsPaid || 0))
-                      const totalRemaining = sessionsRemaining + bookingsRemaining
 
-                      const sessionsCredit = Math.max(0, p.sessionsBalance || 0)
-                      const bookingsCredit = Math.max(0, p.bookingsBalance || 0)
-                      const totalCredit = sessionsCredit + bookingsCredit
+        {loading ? (
+          <div className="spinner-wrapper"><div className="spinner" /></div>
+        ) : filteredPayments.length === 0 ? (
+          <div className="empty-state">
+            <i className="pi pi-check-circle" style={{ fontSize: '2.5rem', color: '#10b981' }} />
+            <p>لا توجد سجلات مطابقة للبحث أو التصفية الحالية</p>
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>الطالب</th>
+                  <th>المجموعة / الصف</th>
+                  <th>المطلوب</th>
+                  <th>المدفوع</th>
+                  <th>المتبقي (مديونية)</th>
+                  <th>آخر حركة دفع</th>
+                  <th>إجراءات التحصيل والتواصل</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPayments.map(p => {
+                  const sessionsRemaining = Math.max(0, (p.sessionsDue || 0) - (p.sessionsPaid || 0))
+                  const bookingsRemaining = Math.max(0, (p.bookingsDue || 0) - (p.bookingsPaid || 0))
+                  const totalRemaining = sessionsRemaining + bookingsRemaining
 
-                      return (
-                        <tr key={p.id}>
-                          <td>
-                            <Link to={`/students/${p.studentId}/dashboard`} style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: 600 }}>
-                              {p.student?.name}
-                            </Link>
-                          </td>
-                          <td>
-                            {p.student?.group?.name}
-                            <span className="text-muted text-sm" style={{ display: 'block' }}>{p.student?.group?.grade}</span>
-                          </td>
-                          <td>{p.amountDue?.toFixed(2)} ج</td>
-                          <td><span className="badge badge-success">{p.amountPaid?.toFixed(2)} ج</span></td>
-                          <td>
-                            {totalRemaining > 0 ? (
-                              <span className="badge badge-danger">{totalRemaining.toFixed(2)} ج</span>
-                            ) : totalCredit > 0 ? (
-                              <span className="badge badge-success">رصيد: {totalCredit.toFixed(2)} ج</span>
-                            ) : (
-                              <span className="badge badge-success">0 ج</span>
-                            )}
-                            {(sessionsCredit > 0 || bookingsCredit > 0) && (
-                              <div className="text-muted text-sm" style={{ marginTop: '0.2rem' }}>
-                                {sessionsCredit > 0 && <div>رصيد حصص: {sessionsCredit.toFixed(2)} ج</div>}
-                                {bookingsCredit > 0 && <div>رصيد كتب: {bookingsCredit.toFixed(2)} ج</div>}
-                              </div>
-                            )}
-                          </td>
-                          <td className="text-sm text-muted">{p.lastPayment ? `${p.lastPayment} ج` : '-'}</td>
-                          <td>
-                            <div style={{ display: 'flex', gap: '0.4rem' }}>
-                              <button className="btn btn-success btn-sm" onClick={() => { setPaymentModal(p); setPaymentForm({ amount: '', type: 'sessions' }) }}>
-                                <i className="pi pi-plus" /> دفعة
-                              </button>
-                              <Link to={`/payments/${p.studentId}/history`} className="btn btn-secondary btn-sm">
-                                <i className="pi pi-history" />
-                              </Link>
+                  const sessionsCredit = Math.max(0, p.sessionsBalance || 0)
+                  const bookingsCredit = Math.max(0, p.bookingsBalance || 0)
+                  const totalCredit = sessionsCredit + bookingsCredit
+
+                  const hasDebt = totalRemaining > 0
+
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        <Link to={`/students/${p.studentId}/dashboard`} style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: 700 }}>
+                          {p.student?.name}
+                        </Link>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-color-secondary)' }}>
+                          كود: #{p.studentId}
+                        </div>
+                      </td>
+
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{p.student?.group?.name || '-'}</div>
+                        <span className="text-muted text-sm">{p.student?.group?.grade || '-'}</span>
+                      </td>
+
+                      <td style={{ fontWeight: 600 }}>
+                        {(p.amountDue || 0).toFixed(0)} ج
+                      </td>
+
+                      <td>
+                        <span className="badge badge-success">
+                          {(p.amountPaid || 0).toFixed(0)} ج
+                        </span>
+                      </td>
+
+                      <td>
+                        {hasDebt ? (
+                          <div>
+                            <span className="badge badge-danger" style={{ fontSize: '0.85rem', fontWeight: 800, padding: '0.3rem 0.6rem' }}>
+                              {totalRemaining.toFixed(0)} ج متبقي
+                            </span>
+                            <div className="text-muted text-xs" style={{ marginTop: '0.2rem' }}>
+                              {sessionsRemaining > 0 && <span>حصص: {sessionsRemaining.toFixed(0)} ج </span>}
+                              {bookingsRemaining > 0 && <span>كتب: {bookingsRemaining.toFixed(0)} ج</span>}
                             </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )
-        }
-        <Pagination
-          totalItems={state.total}
-          itemsPerPage={PER_PAGE}
-          currentPage={state.page}
-          onPageChange={page => load(page)}
-        />
+                          </div>
+                        ) : totalCredit > 0 ? (
+                          <span className="badge badge-info">
+                            رصيد فايض: {totalCredit.toFixed(0)} ج
+                          </span>
+                        ) : (
+                          <span className="badge badge-success">
+                            خالص ✅
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="text-sm text-muted">
+                        {p.lastPayment ? `${p.lastPayment} ج` : 'لا يوجد'}
+                      </td>
+
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                          <button
+                            className="btn btn-success btn-sm"
+                            style={{ fontWeight: 700, padding: '0.3rem 0.65rem' }}
+                            title="إضافة دفعة سداد"
+                            onClick={() => { setPaymentModal(p); setPaymentForm({ amount: '', type: 'sessions' }) }}
+                          >
+                            <i className="pi pi-plus" /> تحصيل
+                          </button>
+
+                          {hasDebt && (
+                            <button
+                              className="btn btn-sm btn-icon"
+                              title="إرسال تذكير بالمديونية لولي الأمر عبر واتساب"
+                              style={{ background: '#25D366', color: '#ffffff', border: '1px solid #1ebe5d' }}
+                              onClick={() => sendWhatsAppDebtReminder(p, totalRemaining)}
+                            >
+                              <i className="pi pi-whatsapp" />
+                            </button>
+                          )}
+
+                          <Link
+                            to={`/payments/${p.studentId}/history`}
+                            className="btn btn-secondary btn-sm btn-icon"
+                            title="سجل المدفوعات التاريخي"
+                          >
+                            <i className="pi pi-history" />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <Pagination 
+            totalItems={state.total} 
+            itemsPerPage={PER_PAGE} 
+            currentPage={state.page} 
+            onPageChange={page => load(page)} 
+          />
+        )}
       </div>
 
+      {/* Modal: Add Payment */}
       {paymentModal && (
         <div className="modal-overlay" onClick={() => setPaymentModal(null)}>
-          <div className="modal" style={{ maxWidth: '400px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title"><i className="pi pi-money-bill" /> إضافة دفعة سريعة</h3>
+              <h3 className="modal-title"><i className="pi pi-plus-circle" /> تسجيل دفعة: {paymentModal.student?.name}</h3>
               <button className="modal-close" onClick={() => setPaymentModal(null)}><i className="pi pi-times" /></button>
-            </div>
-            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--surface-ground)', borderRadius: 'var(--border-radius)', fontSize: '0.9rem' }}>
-              <strong>الطالب:</strong> {paymentModal.student?.name} <br />
-              <strong>المتبقي (حصص):</strong> {Math.max(0, (paymentModal.sessionsDue - paymentModal.sessionsPaid)).toFixed(2)} ج <br />
-              <strong>المتبقي (كتب):</strong> {Math.max(0, (paymentModal.bookingsDue - paymentModal.bookingsPaid)).toFixed(2)} ج
-
-              {paymentModal.sessionsBalance > 0 && (
-                <div style={{ marginTop: '0.5rem', color: 'var(--success-color)', fontWeight: 'bold' }}>
-                  رصيد حصص فايض (لسه محجزتش عليه): {paymentModal.sessionsBalance.toFixed(2)} ج
-                </div>
-              )}
-              {paymentModal.bookingsBalance > 0 && (
-                <div style={{ marginTop: '0.3rem', color: 'var(--success-color)', fontWeight: 'bold' }}>
-                  رصيد كتب فايض (لسه محجزتش عليه): {paymentModal.bookingsBalance.toFixed(2)} ج
-                </div>
-              )}
             </div>
             <form onSubmit={handleAddPayment}>
               <div className="form-group">
-                <label className="form-label">المبلغ (جنيه)</label>
-                <input className="form-control" type="number" min="1" required autoFocus value={paymentForm.amount} onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))} />
+                <label className="form-label">المبلغ المدفوع (جنيه)</label>
+                <input
+                  className="form-control"
+                  type="number"
+                  min="1"
+                  required
+                  placeholder="مثال: 70"
+                  value={paymentForm.amount}
+                  onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))}
+                />
               </div>
+
               <div className="form-group">
                 <label className="form-label">نوع الدفعة</label>
-                <select className="form-control" value={paymentForm.type} onChange={e => setPaymentForm(f => ({ ...f, type: e.target.value }))}>
-                  <option value="sessions">حصص</option>
-                  <option value="book">كتب / مذكرات</option>
+                <select
+                  className="form-control"
+                  value={paymentForm.type}
+                  onChange={e => setPaymentForm(f => ({ ...f, type: e.target.value }))}
+                >
+                  <option value="sessions">سداد حصص / محاضرات</option>
+                  <option value="book">سداد مذكرات / كتب</option>
                 </select>
-                <small className="text-muted" style={{ display: 'block', marginTop: '0.5rem' }}>
-                  سيتم توزيع المبلغ تلقائياً على مستحقات نفس النوع فقط، وإذا تبقى مبلغ سيُحفظ كرصيد لنفس النوع للمستقبل.
-                </small>
               </div>
+
               <div className="modal-footer">
-                <button type="submit" className="btn btn-primary"><i className="pi pi-check" /> دفع</button>
+                <button type="submit" className="btn btn-primary"><i className="pi pi-check" /> حفظ الدفعة</button>
                 <button type="button" className="btn btn-secondary" onClick={() => setPaymentModal(null)}>إلغاء</button>
               </div>
             </form>
