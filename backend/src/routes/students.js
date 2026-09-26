@@ -35,10 +35,16 @@ router.get('/', requirePermission('students'), async (req, res) => {
 // POST /api/students
 router.post('/', requirePermission('students'), async (req, res) => {
   const prisma = req.app.locals.prisma;
-  const { name, phoneNumber, dadPhoneNumber, sex, groupId, offerId, active } = req.body;
+  const name = req.body.name;
+  const phoneNumber = req.body.phoneNumber || req.body.phone;
+  const dadPhoneNumber = req.body.dadPhoneNumber || req.body.parent_phone || req.body.parentPhone;
+  const sex = req.body.sex || 'male';
+  const rawGroupId = req.body.groupId || req.body.group_id;
+  const rawOfferId = req.body.offerId || req.body.offer_id;
+  const active = req.body.active !== undefined ? req.body.active : true;
   try {
-    const parsedGroupId = parseInt(groupId);
-    let parsedOfferId = parseInt(offerId);
+    const parsedGroupId = parseInt(rawGroupId);
+    let parsedOfferId = parseInt(rawOfferId);
     if (!Number.isInteger(parsedGroupId)) return res.status(400).json({ error: 'Group is required' });
     if (!Number.isInteger(parsedOfferId)) {
       const defaultOffer = await prisma.offer.upsert({
@@ -93,11 +99,17 @@ router.get('/:id', requirePermission('students'), async (req, res) => {
 // PUT /api/students/:id
 router.put('/:id', requirePermission('students'), async (req, res) => {
   const prisma = req.app.locals.prisma;
-  const { name, phoneNumber, dadPhoneNumber, sex, groupId, offerId, active } = req.body;
+  const name = req.body.name;
+  const phoneNumber = req.body.phoneNumber || req.body.phone;
+  const dadPhoneNumber = req.body.dadPhoneNumber || req.body.parent_phone || req.body.parentPhone;
+  const sex = req.body.sex;
+  const rawGroupId = req.body.groupId || req.body.group_id;
+  const rawOfferId = req.body.offerId || req.body.offer_id;
+  const active = req.body.active;
   try {
-    const parsedGroupId = parseInt(groupId);
-    let parsedOfferId = parseInt(offerId);
-    if (!Number.isInteger(parsedGroupId)) return res.status(400).json({ error: 'Group is required' });
+    const parsedGroupId = rawGroupId !== undefined ? parseInt(rawGroupId) : undefined;
+    let parsedOfferId = rawOfferId !== undefined ? parseInt(rawOfferId) : undefined;
+    if (parsedGroupId !== undefined && !Number.isInteger(parsedGroupId)) return res.status(400).json({ error: 'Group is required' });
     if (!Number.isInteger(parsedOfferId)) {
       const defaultOffer = await prisma.offer.upsert({
         where: { id: 1 },

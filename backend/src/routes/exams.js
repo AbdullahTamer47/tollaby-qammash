@@ -32,14 +32,18 @@ router.get('/', requirePermission('exams'), async (req, res) => {
 // POST /api/exams
 router.post('/', requirePermission('exams'), async (req, res) => {
   const prisma = req.app.locals.prisma;
-  const { title, totalDegree, minPassDegree, groupId, grade } = req.body;
+  const title = req.body.title;
+  const rawTotal = req.body.totalDegree ?? req.body.max_degree ?? req.body.maxDegree;
+  const rawMin = req.body.minPassDegree ?? req.body.min_degree ?? req.body.minDegree;
+  const rawGroupId = req.body.groupId || req.body.group_id;
+  const grade = req.body.grade;
   try {
-    const total = parseFloat(totalDegree);
-    const minPass = parseFloat(minPassDegree || 0);
+    const total = parseFloat(rawTotal);
+    const minPass = parseFloat(rawMin || 0);
     if (!Number.isFinite(total) || total <= 0) return res.status(400).json({ error: 'Invalid total degree' });
     if (!Number.isFinite(minPass) || minPass < 0 || minPass > total) return res.status(400).json({ error: 'Invalid minimum pass degree' });
     const exam = await prisma.exam.create({
-      data: { title, totalDegree: total, minPassDegree: minPass, groupId: groupId ? parseInt(groupId) : null, grade: grade || null },
+      data: { title, totalDegree: total, minPassDegree: minPass, groupId: rawGroupId ? parseInt(rawGroupId) : null, grade: grade || null },
       include: { group: true }
     });
     await logAction(prisma, req, `إضافة امتحان ${title}`, 'POST');

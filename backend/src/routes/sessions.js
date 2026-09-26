@@ -27,15 +27,16 @@ router.get('/', requirePermission('sessions'), async (req, res) => {
 // POST /api/sessions
 router.post('/', requirePermission('sessions'), async (req, res) => {
   const prisma = req.app.locals.prisma;
-  const { groupId, grade, title, type, description, location, duration, price, date, active } = req.body;
+  const rawGroupId = req.body.groupId || req.body.group_id;
+  const { grade, title, type, description, location, duration, price, date, active } = req.body;
   const isLecture = type === 'lecture';
   try {
     if (isLecture && !grade) return res.status(400).json({ error: 'الصف الدراسي مطلوب للمحاضرة' });
-    if (!isLecture && !groupId) return res.status(400).json({ error: 'المجموعة مطلوبة للحصة' });
+    if (!isLecture && !rawGroupId) return res.status(400).json({ error: 'المجموعة مطلوبة للحصة' });
 
     const session = await prisma.session.create({
       data: {
-        groupId: isLecture ? null : parseInt(groupId),
+        groupId: isLecture ? null : parseInt(rawGroupId),
         grade: isLecture ? grade : null,
         title,
         type: isLecture ? 'lecture' : 'session',
