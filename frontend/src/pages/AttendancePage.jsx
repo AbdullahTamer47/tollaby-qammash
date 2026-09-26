@@ -413,7 +413,20 @@ export default function AttendancePage() {
                 style={{ display: 'none' }}
                 onChange={handleFileScan}
               />
-              <button className={`btn ${cameraEnabled ? 'btn-danger' : 'btn-success'}`} onClick={() => setCameraEnabled(!cameraEnabled)}>
+              <button 
+                className={`btn ${cameraEnabled ? 'btn-danger' : 'btn-success'}`} 
+                onClick={() => {
+                  if (!cameraEnabled && !isHttpsOrLocal) {
+                    setScanMsg({
+                      type: 'warning',
+                      text: '⚠️ متصفح كروم على الموبايل يتطلب HTTPS للبث الحي — تم فتح كاميرا الهاتف لالتقاط صورة الكود مباشرة'
+                    })
+                    fileInputRef.current?.click()
+                    return
+                  }
+                  setCameraEnabled(!cameraEnabled)
+                }}
+              >
                 {cameraEnabled ? 'إيقاف البث الحي' : 'كاميرا البث المباشر'}
               </button>
             </div>

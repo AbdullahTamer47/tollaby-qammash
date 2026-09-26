@@ -73,7 +73,9 @@ export default function TopBar({ user, onMenuToggle }) {
   }
 
   // Local network URL (LAN / Hotspot)
-  const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:'
+  // Ensure HTTPS is used for LAN so mobile browsers allow camera permissions (Secure Context)
+  const isSslHost = typeof window !== 'undefined' && (window.location.protocol === 'https:' || window.location.port === '5173')
+  const protocol = isSslHost ? 'https:' : (typeof window !== 'undefined' ? window.location.protocol : 'https:')
   const port = typeof window !== 'undefined' && window.location.port ? window.location.port : '5173'
   const localUrl = selectedIp ? `${protocol}//${selectedIp}:${port}` : (typeof window !== 'undefined' ? window.location.origin : '')
   const localConnectUrl = `${localUrl}/login?connect=true`
@@ -314,11 +316,12 @@ export default function TopBar({ user, onMenuToggle }) {
                 <i className="pi pi-info-circle" style={{ color: '#3b82f6', marginLeft: '0.35rem' }} />
                 {connectMode === 'local' ? (
                   <>
-                    <strong>الشبكة المحلية:</strong>
+                    <strong>الشبكة المحلية (واي فاي / هوتسبوت):</strong>
                     <ul style={{ margin: '0.35rem 0 0', paddingRight: '1.25rem' }}>
-                      <li>الموبايل لازم يكون متصل بنفس شبكة الواي فاي.</li>
-                      <li>أو افتح <strong>Hotspot</strong> من اللاب توب ووصّل بيه الموبايل.</li>
-                      <li>يعمل حتى لو مفيش إنترنت — المهم نفس الشبكة.</li>
+                      <li>الموبايل لازم يكون متصل بنفس شبكة الواي فاي أو الهوتسبوت.</li>
+                      <li>الرابط مشفر بـ <strong>HTTPS</strong> لتشغيل كاميرا الهاتف.</li>
+                      <li>إذا ظهرت في كروم رسالة (الاتصال ليس خاصاً): اضغط <strong>خيارات متقدمة (Advanced)</strong> ثم <strong>متابعة إلى 192.168.x.x</strong> لتسمح بالكاميرا.</li>
+                      <li>أو استخدم تبويب <strong>عبر الإنترنت (سحابي)</strong> للدخول بدون أي رسائل أمان.</li>
                     </ul>
                   </>
                 ) : (
