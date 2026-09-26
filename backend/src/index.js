@@ -165,6 +165,11 @@ app.use('/api/notification-templates', require('./routes/notificationTemplates')
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 app.get('/api/network-info', (req, res) => {
+  // If running on Vercel or cloud serverless, it has no LAN interfaces
+  if (isVercel || process.env.VERCEL) {
+    return res.json({ addresses: [], isCloud: true });
+  }
+
   const interfaces = os.networkInterfaces();
   const addresses = [];
   for (const name of Object.keys(interfaces)) {

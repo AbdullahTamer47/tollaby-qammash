@@ -7,10 +7,13 @@ export default function TopBar({ user, onMenuToggle }) {
   const [searchQ, setSearchQ] = useState('')
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true)
   const [showConnectModal, setShowConnectModal] = useState(false)
-  const isCloudHost = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+  const isCloudHost = typeof window !== 'undefined' && (
+    window.location.hostname.includes('vercel.app') ||
+    window.location.protocol === 'https:'
+  )
   const [connectMode, setConnectMode] = useState(isCloudHost ? 'cloud' : 'local')
   const [networkAddresses, setNetworkAddresses] = useState([])
-  const [selectedIp, setSelectedIp] = useState('')
+  const [selectedIp, setSelectedIp] = useState('192.168.1.12')
   const [copied, setCopied] = useState(false)
   const navigate = useNavigate()
   const inputRef = useRef(null)
@@ -38,11 +41,16 @@ export default function TopBar({ user, onMenuToggle }) {
 
   const openConnectModal = async () => {
     setShowConnectModal(true)
-    if (!isCloudHost) {
+    if (isCloudHost) {
+      setConnectMode('cloud')
+    } else {
       setConnectMode('local')
     }
     try {
       const res = await getNetworkInfo()
+      if (res.data?.isCloud) {
+        setConnectMode('cloud')
+      }
       const rawAddrs = res.data.addresses || []
       // Strictly exclude any link-local 169.254.x.x addresses
       const addrs = rawAddrs.filter(a => a.address && !a.address.startsWith('169.254.'))
@@ -54,13 +62,13 @@ export default function TopBar({ user, onMenuToggle }) {
 
       if (primary) {
         setSelectedIp(primary)
-      } else if (window.location.hostname && !window.location.hostname.startsWith('169.254.')) {
+      } else if (window.location.hostname && !window.location.hostname.startsWith('169.254.') && !window.location.hostname.includes('vercel.app') && window.location.hostname !== 'localhost') {
         setSelectedIp(window.location.hostname)
       } else {
         setSelectedIp('192.168.1.12')
       }
     } catch {
-      setSelectedIp(window.location.hostname || '192.168.1.12')
+      setSelectedIp('192.168.1.12')
     }
   }
 
@@ -70,7 +78,9 @@ export default function TopBar({ user, onMenuToggle }) {
   const localConnectUrl = `${localUrl}/login?connect=true`
 
   // Cloud URL (Vercel production)
-  const cloudUrl = 'https://tollaby-qammash-web.vercel.app'
+  const cloudUrl = (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app'))
+    ? window.location.origin
+    : 'https://tollaby-qammash-web.vercel.app'
   const cloudConnectUrl = `${cloudUrl}/login?connect=true`
 
   // Active URL based on mode
