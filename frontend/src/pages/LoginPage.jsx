@@ -67,19 +67,14 @@ export default function LoginPage() {
             setShowScanner(false)
 
             const targetUrl = new URL(raw)
-            const currentOrigin = window.location.origin
 
-            // Set custom server for Capacitor & Axios
+            // Set custom server for Axios API calls
             setCustomServerUrl(targetUrl.origin)
 
             // Switch to scanned account picker mode
             setIsScannedMode(true)
             setScannedAlert(true)
             loadUsers()
-
-            if (targetUrl.origin !== currentOrigin) {
-              window.location.href = `${targetUrl.origin}/login?connect=true`
-            }
           }
         } catch {
           setShowScanner(false)
@@ -565,7 +560,7 @@ export default function LoginPage() {
             onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
           >
             <i className="pi pi-qrcode" style={{ color: '#60a5fa', fontSize: '1.1rem' }} />
-            مسح كود شاشة اللاب توب للربط الفوري (بدون نت)
+            مسح كود شاشة اللاب توب للربط الفوري
           </button>
         </div>
 

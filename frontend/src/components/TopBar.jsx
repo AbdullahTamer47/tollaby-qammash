@@ -7,6 +7,7 @@ export default function TopBar({ user, onMenuToggle }) {
   const [searchQ, setSearchQ] = useState('')
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true)
   const [showConnectModal, setShowConnectModal] = useState(false)
+  const [connectMode, setConnectMode] = useState('local') // 'local' | 'cloud'
   const [networkAddresses, setNetworkAddresses] = useState([])
   const [selectedIp, setSelectedIp] = useState('')
   const [copied, setCopied] = useState(false)
@@ -50,9 +51,17 @@ export default function TopBar({ user, onMenuToggle }) {
     }
   }
 
+  // Local network URL (LAN / Hotspot)
   const port = window.location.port || '5173'
-  const baseUrl = selectedIp ? `http://${selectedIp}:${port}` : window.location.origin
-  const connectUrl = `${baseUrl}/login?connect=true`
+  const localUrl = selectedIp ? `http://${selectedIp}:${port}` : window.location.origin
+  const localConnectUrl = `${localUrl}/login?connect=true`
+
+  // Cloud URL (Vercel production)
+  const cloudUrl = 'https://tollaby-qammash-web.vercel.app'
+  const cloudConnectUrl = `${cloudUrl}/login?connect=true`
+
+  // Active URL based on mode
+  const connectUrl = connectMode === 'cloud' ? cloudConnectUrl : localConnectUrl
 
   const copyUrl = () => {
     navigator.clipboard.writeText(connectUrl).then(() => {
@@ -88,7 +97,7 @@ export default function TopBar({ user, onMenuToggle }) {
         <button
           className="btn btn-sm btn-secondary"
           onClick={openConnectModal}
-          title="ربط كاميرا هاتف المساعد باللاب توب بدون نت"
+          title="ربط كاميرا هاتف المساعد باللاب توب"
           style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', fontSize: '0.82rem' }}
         >
           <i className="pi pi-mobile" style={{ color: 'var(--primary-color)' }} />
@@ -96,7 +105,7 @@ export default function TopBar({ user, onMenuToggle }) {
         </button>
 
         <span
-          title={isOnline ? 'متصل بالسحابة والإنترنت' : 'أوفلاين - يعمل على الشبكة المحلية'}
+          title={isOnline ? 'متصل بالإنترنت والسحابة' : 'غير متصل بالإنترنت - يعمل على الشبكة المحلية فقط'}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -111,7 +120,7 @@ export default function TopBar({ user, onMenuToggle }) {
           }}
         >
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isOnline ? '#10b981' : '#f59e0b' }} />
-          {isOnline ? 'سحابي ومحلي' : 'محلي (أوفلاين)'}
+          {isOnline ? 'متصل' : 'غير متصل'}
         </span>
 
         <span style={{ color: 'var(--text-color-secondary)', fontSize: '0.85rem' }}>
@@ -126,11 +135,11 @@ export default function TopBar({ user, onMenuToggle }) {
       {/* Modal: Connect Mobile */}
       {showConnectModal && (
         <div className="modal-overlay" onClick={() => setShowConnectModal(false)}>
-          <div className="modal" style={{ maxWidth: '440px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: '460px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header" style={{ justifyContent: 'space-between' }}>
               <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <i className="pi pi-mobile" style={{ color: 'var(--primary-color)' }} />
-                ربط الهاتف باللاب توب (بدون نت)
+                ربط الهاتف بالمنصة
               </h3>
               <button className="modal-close" onClick={() => setShowConnectModal(false)}>
                 <i className="pi pi-times" />
@@ -138,8 +147,60 @@ export default function TopBar({ user, onMenuToggle }) {
             </div>
 
             <div style={{ padding: '1rem 0' }}>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-color-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
-                امسح الـ QR بكاميرا الهاتف أو ادخل الرابط لفتح المنصة مباشرة من الموبايل وإرسال الحضور للاب توب بدون إنترنت:
+              {/* Mode Switcher */}
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginBottom: '1.25rem',
+                background: 'var(--surface-ground)',
+                borderRadius: '12px',
+                padding: '0.35rem',
+                border: '1px solid var(--surface-border)'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setConnectMode('local')}
+                  style={{
+                    flex: 1,
+                    padding: '0.6rem 0.5rem',
+                    borderRadius: '10px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    background: connectMode === 'local' ? 'var(--primary-color)' : 'transparent',
+                    color: connectMode === 'local' ? '#fff' : 'var(--text-color-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <i className="pi pi-wifi" style={{ marginLeft: '0.35rem' }} />
+                  شبكة محلية (واي فاي)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConnectMode('cloud')}
+                  style={{
+                    flex: 1,
+                    padding: '0.6rem 0.5rem',
+                    borderRadius: '10px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    background: connectMode === 'cloud' ? 'var(--primary-color)' : 'transparent',
+                    color: connectMode === 'cloud' ? '#fff' : 'var(--text-color-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <i className="pi pi-cloud" style={{ marginLeft: '0.35rem' }} />
+                  عبر الإنترنت (سحابي)
+                </button>
+              </div>
+
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-color-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+                {connectMode === 'local'
+                  ? 'امسح الـ QR بكاميرا الهاتف لفتح المنصة عبر الشبكة المحلية (الموبايل لازم يكون على نفس الواي فاي أو الهوتسبوت):'
+                  : 'امسح الـ QR بكاميرا الهاتف لفتح المنصة عبر الإنترنت (يعمل من أي مكان):'}
               </p>
 
               {/* QR Code Container */}
@@ -155,8 +216,8 @@ export default function TopBar({ user, onMenuToggle }) {
                 <QRCodeSVG value={connectUrl} size={190} level="M" />
               </div>
 
-              {/* IP Selection if multiple interfaces */}
-              {networkAddresses.length > 1 && (
+              {/* IP Selection if local mode and multiple interfaces */}
+              {connectMode === 'local' && networkAddresses.length > 1 && (
                 <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
                   <label className="form-label" style={{ fontSize: '0.8rem' }}>اختر عنوان الشبكة:</label>
                   <select
@@ -185,14 +246,14 @@ export default function TopBar({ user, onMenuToggle }) {
                 border: '1px solid var(--surface-border)',
                 marginBottom: '1rem'
               }}>
-                <span style={{ direction: 'ltr', fontSize: '0.85rem', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <span style={{ direction: 'ltr', fontSize: '0.82rem', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {connectUrl}
                 </span>
                 <button
                   type="button"
                   className="btn btn-sm btn-primary"
                   onClick={copyUrl}
-                  style={{ padding: '0.35rem 0.75rem' }}
+                  style={{ padding: '0.35rem 0.75rem', flexShrink: 0 }}
                 >
                   <i className={`pi ${copied ? 'pi-check' : 'pi-copy'}`} />
                   {copied ? ' تم النسخ' : ' نسخ'}
@@ -210,11 +271,24 @@ export default function TopBar({ user, onMenuToggle }) {
                 lineHeight: 1.6
               }}>
                 <i className="pi pi-info-circle" style={{ color: '#3b82f6', marginLeft: '0.35rem' }} />
-                <strong>شروط الربط السريع:</strong>
-                <ul style={{ margin: '0.35rem 0 0', paddingRight: '1.25rem' }}>
-                  <li>أن يكون الموبايل متصلاً بنفس راوتر الواي فاي (حتى لو الراوتر بدون نت).</li>
-                  <li>أو يفتح اللاب توب <strong>Mobile Hotspot (نقطة اتصال)</strong> ويتصل بها الهاتف.</li>
-                </ul>
+                {connectMode === 'local' ? (
+                  <>
+                    <strong>الشبكة المحلية:</strong>
+                    <ul style={{ margin: '0.35rem 0 0', paddingRight: '1.25rem' }}>
+                      <li>الموبايل لازم يكون متصل بنفس شبكة الواي فاي.</li>
+                      <li>أو افتح <strong>Hotspot</strong> من اللاب توب ووصّل بيه الموبايل.</li>
+                      <li>يعمل حتى لو مفيش إنترنت — المهم نفس الشبكة.</li>
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <strong>الربط السحابي:</strong>
+                    <ul style={{ margin: '0.35rem 0 0', paddingRight: '1.25rem' }}>
+                      <li>يعمل من أي مكان — الموبايل محتاج إنترنت فقط.</li>
+                      <li>بيانات المنصة متزامنة في السحابة.</li>
+                    </ul>
+                  </>
+                )}
               </div>
             </div>
           </div>

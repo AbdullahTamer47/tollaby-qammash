@@ -1,7 +1,21 @@
 import axios from 'axios'
 
+// Detect if running inside Capacitor (Android/iOS) native app
+const isCapacitor = typeof window !== 'undefined' && (
+  window.Capacitor?.isNativePlatform?.() ||
+  window.location.protocol === 'capacitor:' ||
+  window.location.protocol === 'ionic:'
+);
+
+const CLOUD_API = 'https://tollaby-qammash-web.vercel.app/api';
 const savedServer = typeof window !== 'undefined' ? localStorage.getItem('qammash_server_url') : null;
-const apiBase = savedServer ? `${savedServer}/api` : (import.meta.env.VITE_API_URL || '/api');
+
+// Priority: saved server > Capacitor native (use cloud) > env var > relative /api
+const apiBase = savedServer
+  ? `${savedServer}/api`
+  : isCapacitor
+    ? CLOUD_API
+    : (import.meta.env.VITE_API_URL || '/api');
 
 const api = axios.create({
   baseURL: apiBase,
