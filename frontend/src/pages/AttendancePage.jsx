@@ -65,6 +65,29 @@ export default function AttendancePage() {
   const scannerRef = useRef(null)
   const lastScannedRef = useRef('')
   const lastScanTimeRef = useRef(0)
+  const fileInputRef = useRef(null)
+
+  const isHttpsOrLocal = typeof window !== 'undefined' && (
+    window.location.protocol === 'https:' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    Boolean(window.isSecureContext)
+  )
+
+  const handleFileScan = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode')
+      const html5QrCode = new Html5Qrcode('qr-reader-file-temp')
+      const decodedText = await html5QrCode.scanFile(file, true)
+      handleQRScan(decodedText)
+    } catch {
+      setScanMsg({ type: 'error', text: 'لم يتم التعرف على كود في الصورة، حاول التقاط صورة أقرب للباركود' })
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   // Offline queue helpers
   const getOfflineQueue = () => {
@@ -369,17 +392,56 @@ export default function AttendancePage() {
 
         {/* QR Scan Camera */}
         <div className="card" style={{ marginBottom: 0 }}>
-          <div className="card-header">
+          <div className="card-header" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
             <h2 className="card-title"><i className="pi pi-camera" /> كاميرا الهاتف (أندرويد / آيفون)</h2>
-            <button className={`btn ${cameraEnabled ? 'btn-danger' : 'btn-success'}`} onClick={() => setCameraEnabled(!cameraEnabled)}>
-              {cameraEnabled ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا'}
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                title="التقاط صورة للباركود بالكاميرا (يعمل على أي متصفح وبدون قيود HTTPS)"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <i className="pi pi-camera" style={{ color: 'var(--primary-color)' }} />
+                <span>التقاط صورة للباركود</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={handleFileScan}
+              />
+              <button className={`btn ${cameraEnabled ? 'btn-danger' : 'btn-success'}`} onClick={() => setCameraEnabled(!cameraEnabled)}>
+                {cameraEnabled ? 'إيقاف البث الحي' : 'كاميرا البث المباشر'}
+              </button>
+            </div>
           </div>
+
+          {!isHttpsOrLocal && (
+            <div style={{
+              background: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              borderRadius: '8px',
+              padding: '0.65rem 0.85rem',
+              fontSize: '0.82rem',
+              color: '#d97706',
+              marginBottom: '0.75rem',
+              lineHeight: 1.6
+            }}>
+              <i className="pi pi-info-circle" style={{ marginLeft: '0.35rem' }} />
+              <strong>تنبيه لمتصفح كروم على الموبايل:</strong> بث الكاميرا المباشر يتطلب اتصال آمن (HTTPS).
+              يمكنك استخدام زر <strong>"التقاط صورة للباركود"</strong> أعلاه فوراً بدون قيود، أو الدخول عبر الرابط السحابي <strong>HTTPS</strong> المباشر للمنصة.
+            </div>
+          )}
+
           {cameraEnabled && (
             <div style={{ background: 'var(--surface-ground)', borderRadius: 'var(--border-radius)', overflow: 'hidden', padding: '0.5rem' }}>
               <div id="qr-reader" style={{ width: '100%', maxWidth: '300px', margin: '0 auto' }}></div>
             </div>
           )}
+          <div id="qr-reader-file-temp" style={{ display: 'none' }}></div>
         </div>
       </div>
 

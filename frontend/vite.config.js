@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), basicSsl()],
   // إعدادات البناء (Build) الخاصة برفع المشروع على Vercel أو أي منصة
   build: {
     outDir: 'dist', // المجلد اللي هيتولد فيه المشروع النهائي

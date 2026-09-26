@@ -73,8 +73,9 @@ export default function TopBar({ user, onMenuToggle }) {
   }
 
   // Local network URL (LAN / Hotspot)
-  const port = window.location.port || '5173'
-  const localUrl = selectedIp ? `http://${selectedIp}:${port}` : window.location.origin
+  const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:'
+  const port = typeof window !== 'undefined' && window.location.port ? window.location.port : '5173'
+  const localUrl = selectedIp ? `${protocol}//${selectedIp}:${port}` : (typeof window !== 'undefined' ? window.location.origin : '')
   const localConnectUrl = `${localUrl}/login?connect=true`
 
   // Cloud URL (Vercel production)
