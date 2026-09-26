@@ -82,6 +82,7 @@ const sessionStore = new PrismaSessionStore(
 );
 
 // Session
+const isProdOrVercel = isProduction || isVercel;
 app.use(session({
   name: 'tollaby.sid',
   secret: process.env.SESSION_SECRET || 'secret',
@@ -90,11 +91,27 @@ app.use(session({
   store: sessionStore,
   cookie: {
     httpOnly: true,
-    secure: isProduction ? 'auto' : false,
-    sameSite: cookieSameSite,
+    secure: isProdOrVercel ? true : false,
+    sameSite: isProdOrVercel ? 'none' : 'lax',
     maxAge: 1000 * 60 * 60 * 24, // 1 day
   }
 }));
+
+// Dual-Auth: Support Header-based session token for mobile Capacitor app / cross-origin API calls
+app.use((req, res, next) => {
+  const token = req.headers['x-session-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '');
+  if (token && (!req.session || !req.session.userId)) {
+    sessionStore.get(token, (err, sess) => {
+      if (!err && sess && sess.userId) {
+        req.session = Object.assign(req.session || {}, sess);
+        req.sessionID = token;
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+});
 
 // Rate limiters
 const loginLimiter = rateLimit({

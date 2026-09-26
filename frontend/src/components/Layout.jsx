@@ -122,6 +122,53 @@ export default function Layout() {
         </main>
       </div>
 
+      {/* Mobile Bottom Navigation Bar (App Experience) */}
+      <nav className="mobile-bottom-nav">
+        <NavLink
+          to={user?.role === 'teacher' ? '/teacher-dashboard' : '/sessions'}
+          className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+        >
+          <i className="pi pi-home" />
+          <span>الرئيسية</span>
+        </NavLink>
+
+        <NavLink
+          to="/students"
+          className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+        >
+          <i className="pi pi-users" />
+          <span>الطلاب</span>
+        </NavLink>
+
+        <NavLink
+          to="/sessions"
+          className={({ isActive }) => `bottom-nav-item bottom-nav-scan ${isActive ? 'active' : ''}`}
+          title="تسجيل الحضور بالكاميرا"
+        >
+          <div className="bottom-nav-scan-btn">
+            <i className="pi pi-camera" />
+          </div>
+          <span>حضور</span>
+        </NavLink>
+
+        <NavLink
+          to="/payments"
+          className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+        >
+          <i className="pi pi-wallet" />
+          <span>المالية</span>
+        </NavLink>
+
+        <button
+          type="button"
+          className="bottom-nav-item"
+          onClick={() => setSidebarOpen(true)}
+        >
+          <i className="pi pi-bars" />
+          <span>المزيد</span>
+        </button>
+      </nav>
+
       {/* Overlay for mobile */}
       {sidebarOpen && (
         <div

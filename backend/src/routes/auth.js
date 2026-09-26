@@ -69,7 +69,7 @@ router.post('/login', (req, res, next) => {
         console.error('Session Save Error:', err);
         return res.status(500).json({ error: 'تعذر حفظ جلسة تسجيل الدخول' });
       }
-      res.json({ id: user.id, username: user.username, role: user.role, permissions });
+      res.json({ id: user.id, username: user.username, role: user.role, permissions, token: req.sessionID });
     });
   } catch (err) {
     console.error('Login Error:', err);

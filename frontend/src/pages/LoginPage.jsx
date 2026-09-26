@@ -583,7 +583,7 @@ export default function LoginPage() {
             <div style={{ padding: '1rem 0' }}>
               <div id="laptop-qr-reader" style={{ width: '100%', margin: '0 auto', overflow: 'hidden', borderRadius: '12px' }}></div>
               <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginTop: '0.85rem', lineHeight: 1.6, padding: '0 0.5rem' }}>
-                اضغط على زر <strong>"📱 ربط الموبايل"</strong> في أعلى شاشة اللاب توب، ثم وجّه كاميرا الموبايل نحو الكود ليتم الربط فوراً بدون نت!
+                اضغط على زر <strong>"📱 ربط الموبايل"</strong> في أعلى شاشة المنصة باللاب توب، ثم وجّه كاميرا الموبايل نحو الكود ليتم الربط فوراً!
               </p>
             </div>
           </div>

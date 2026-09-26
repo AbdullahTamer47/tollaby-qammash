@@ -4,9 +4,7 @@
   "webDir": "dist",
   "server": {
     "cleartext": true,
-    "allowNavigation": ["*"],
-    "url": "https://tollaby-qammash-web.vercel.app",
-    "initialNavigation": "open"
+    "allowNavigation": ["*"]
   },
   "android": {
     "allowMixedContent": true

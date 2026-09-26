@@ -7,7 +7,11 @@ export default function TopBar({ user, onMenuToggle }) {
   const [searchQ, setSearchQ] = useState('')
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true)
   const [showConnectModal, setShowConnectModal] = useState(false)
-  const [connectMode, setConnectMode] = useState('local') // 'local' | 'cloud'
+  const isCloudHost = typeof window !== 'undefined' && (
+    window.location.hostname.includes('vercel.app') ||
+    window.location.protocol === 'https:'
+  )
+  const [connectMode, setConnectMode] = useState(isCloudHost ? 'cloud' : 'cloud') // 'cloud' | 'local'
   const [networkAddresses, setNetworkAddresses] = useState([])
   const [selectedIp, setSelectedIp] = useState('')
   const [copied, setCopied] = useState(false)

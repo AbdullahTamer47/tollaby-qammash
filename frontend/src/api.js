@@ -1,8 +1,9 @@
 import axios from 'axios'
 
-// Detect if running inside Capacitor (Android/iOS) native app
-const isCapacitor = typeof window !== 'undefined' && (
-  window.Capacitor?.isNativePlatform?.() ||
+export const isCapacitor = typeof window !== 'undefined' && (
+  Boolean(window.Capacitor?.isNativePlatform?.()) ||
+  Boolean(window.Capacitor?.getPlatform?.() === 'android') ||
+  Boolean(window.Capacitor?.getPlatform?.() === 'ios') ||
   window.location.protocol === 'capacitor:' ||
   window.location.protocol === 'ionic:'
 );
@@ -23,6 +24,15 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
+// Automatically inject session token for mobile APK and cross-origin calls
+api.interceptors.request.use(config => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('qammash_token') : null;
+  if (token) {
+    config.headers['x-session-token'] = token;
+  }
+  return config;
+});
+
 export const setCustomServerUrl = (url) => {
   if (!url) return;
   const clean = url.replace(/\/+$/, '');
@@ -38,6 +48,7 @@ api.interceptors.response.use(
     const skipGlobalError = error.config?.skipGlobalError;
     if (error.response) {
       if (error.response.status === 401) {
+        if (typeof window !== 'undefined') localStorage.removeItem('qammash_token');
         if (!isLoginRequest && !skipAuthError) {
           window.dispatchEvent(new CustomEvent('api-auth-error'));
         }
@@ -56,8 +67,23 @@ api.interceptors.response.use(
 );
 
 // Auth
-export const login = (data) => api.post('/auth/login', data)
-export const logout = () => api.post('/auth/logout')
+export const login = async (data) => {
+  const res = await api.post('/auth/login', data);
+  if (res.data?.token && typeof window !== 'undefined') {
+    localStorage.setItem('qammash_token', res.data.token);
+  }
+  return res;
+};
+
+export const logout = async () => {
+  try {
+    return await api.post('/auth/logout');
+  } finally {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('qammash_token');
+    }
+  }
+};
 export const getMe = (config = {}) => api.get('/auth/me', config)
 export const updateMe = (data) => api.put('/auth/me', data)
 export const createAssistant = (data) => api.post('/auth/assistants', data)
