@@ -169,12 +169,35 @@ app.get('/api/network-info', (req, res) => {
   const addresses = [];
   for (const name of Object.keys(interfaces)) {
     for (const net of interfaces[name]) {
-      if (net.family === 'IPv4' && !net.internal) {
+      // Must be IPv4, non-internal, and NOT link-local/APIPA (169.254.x.x)
+      if (
+        net.family === 'IPv4' &&
+        !net.internal &&
+        !net.address.startsWith('169.254.') &&
+        net.address !== '0.0.0.0'
+      ) {
         addresses.push({ interface: name, address: net.address });
       }
     }
   }
-  res.json({ addresses, port: 5173 });
+
+  // Prioritize Wi-Fi and common LAN subnets (192.168.x.x, 10.x.x.x, 172.x.x.x)
+  addresses.sort((a, b) => {
+    const isWiFiA = /wi-?fi|wireless|wlan/i.test(a.interface);
+    const isWiFiB = /wi-?fi|wireless|wlan/i.test(b.interface);
+    if (isWiFiA && !isWiFiB) return -1;
+    if (!isWiFiA && isWiFiB) return 1;
+
+    const is192A = a.address.startsWith('192.168.');
+    const is192B = b.address.startsWith('192.168.');
+    if (is192A && !is192B) return -1;
+    if (!is192A && is192B) return 1;
+
+    return 0;
+  });
+
+  const primaryAddress = addresses.length > 0 ? addresses[0].address : 'localhost';
+  res.json({ addresses, primaryAddress, port: 5173 });
 });
 
 

@@ -7,11 +7,8 @@ export default function TopBar({ user, onMenuToggle }) {
   const [searchQ, setSearchQ] = useState('')
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true)
   const [showConnectModal, setShowConnectModal] = useState(false)
-  const isCloudHost = typeof window !== 'undefined' && (
-    window.location.hostname.includes('vercel.app') ||
-    window.location.protocol === 'https:'
-  )
-  const [connectMode, setConnectMode] = useState(isCloudHost ? 'cloud' : 'cloud') // 'cloud' | 'local'
+  const isCloudHost = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')
+  const [connectMode, setConnectMode] = useState(isCloudHost ? 'cloud' : 'local')
   const [networkAddresses, setNetworkAddresses] = useState([])
   const [selectedIp, setSelectedIp] = useState('')
   const [copied, setCopied] = useState(false)
@@ -41,17 +38,29 @@ export default function TopBar({ user, onMenuToggle }) {
 
   const openConnectModal = async () => {
     setShowConnectModal(true)
+    if (!isCloudHost) {
+      setConnectMode('local')
+    }
     try {
       const res = await getNetworkInfo()
-      const addrs = res.data.addresses || []
+      const rawAddrs = res.data.addresses || []
+      // Strictly exclude any link-local 169.254.x.x addresses
+      const addrs = rawAddrs.filter(a => a.address && !a.address.startsWith('169.254.'))
       setNetworkAddresses(addrs)
-      if (addrs.length > 0) {
-        setSelectedIp(addrs[0].address)
+
+      const primary = res.data.primaryAddress && !res.data.primaryAddress.startsWith('169.254.')
+        ? res.data.primaryAddress
+        : (addrs.length > 0 ? addrs[0].address : '')
+
+      if (primary) {
+        setSelectedIp(primary)
+      } else if (window.location.hostname && !window.location.hostname.startsWith('169.254.')) {
+        setSelectedIp(window.location.hostname)
       } else {
-        setSelectedIp(window.location.hostname || 'localhost')
+        setSelectedIp('192.168.1.12')
       }
     } catch {
-      setSelectedIp(window.location.hostname || 'localhost')
+      setSelectedIp(window.location.hostname || '192.168.1.12')
     }
   }
 
@@ -203,7 +212,7 @@ export default function TopBar({ user, onMenuToggle }) {
 
               <p style={{ fontSize: '0.88rem', color: 'var(--text-color-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
                 {connectMode === 'local'
-                  ? 'امسح الـ QR بكاميرا الهاتف لفتح المنصة عبر الشبكة المحلية (الموبايل لازم يكون على نفس الواي فاي أو الهوتسبوت):'
+                  ? 'امسح الـ QR بكاميرا الهاتف لفتح المنصة مباشرة في متصفح كروم على اللاب توب (Host):'
                   : 'امسح الـ QR بكاميرا الهاتف لفتح المنصة عبر الإنترنت (يعمل من أي مكان):'}
               </p>
 
@@ -220,22 +229,39 @@ export default function TopBar({ user, onMenuToggle }) {
                 <QRCodeSVG value={connectUrl} size={190} level="M" />
               </div>
 
-              {/* IP Selection if local mode and multiple interfaces */}
-              {connectMode === 'local' && networkAddresses.length > 1 && (
+              {/* IP Selection if local mode */}
+              {connectMode === 'local' && (
                 <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
-                  <label className="form-label" style={{ fontSize: '0.8rem' }}>اختر عنوان الشبكة:</label>
-                  <select
-                    className="form-control"
-                    value={selectedIp}
-                    onChange={e => setSelectedIp(e.target.value)}
-                    style={{ fontSize: '0.85rem' }}
-                  >
-                    {networkAddresses.map(a => (
-                      <option key={a.address} value={a.address}>
-                        {a.interface}: {a.address}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="form-label" style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                    عنوان اللاب توب (Host IP):
+                  </label>
+                  {networkAddresses.length > 1 ? (
+                    <select
+                      className="form-control"
+                      value={selectedIp}
+                      onChange={e => setSelectedIp(e.target.value)}
+                      style={{ fontSize: '0.88rem' }}
+                    >
+                      {networkAddresses.map(a => (
+                        <option key={a.address} value={a.address}>
+                          {a.interface}: {a.address}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        className="form-control"
+                        value={selectedIp}
+                        onChange={e => setSelectedIp(e.target.value)}
+                        placeholder="192.168.1.12"
+                        style={{ fontSize: '0.88rem', direction: 'ltr', textAlign: 'left' }}
+                      />
+                      <span className="badge badge-success" style={{ whiteSpace: 'nowrap', padding: '0.5rem 0.65rem' }}>
+                        متصل بالواي فاي
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
