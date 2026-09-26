@@ -4,6 +4,7 @@ import { Html5QrcodeScanner } from 'html5-qrcode'
 import { getStudents, deleteStudent, activateStudent, getGroups, getOffers, createStudent, updateStudent } from '../api'
 import { exportToCSV } from '../utils/csvExport'
 import Pagination from '../components/Pagination'
+import StudentReportModal from '../components/StudentReportModal'
 
 const GRADES = [
   'الصف السادس الابتدائي','الصف الأول الاعدادي','الصف الثاني الاعدادي','الصف الثالث الاعدادي',
@@ -17,6 +18,7 @@ const isValidEgyptianPhone = (num) => /^01[0125][0-9]{8}$/.test(num)
 export default function StudentsPage() {
   const [state, setState] = useState({ students: [], total: 0, page: 1 })
   const [loading, setLoading] = useState(true)
+  const [reportStudentId, setReportStudentId] = useState(null)
   
   // Filters
   const [searchQ, setSearchQ] = useState('')
@@ -265,7 +267,15 @@ export default function StudentsPage() {
                           </span>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem' }}>
+                            <button
+                              className="btn btn-sm btn-icon"
+                              title="تقرير المتابعة الشامل لولي الأمر (واتساب / PDF)"
+                              style={{ background: 'rgba(14, 165, 233, 0.15)', color: '#0284c7', border: '1px solid rgba(14, 165, 233, 0.3)' }}
+                              onClick={() => setReportStudentId(s.id)}
+                            >
+                              <i className="pi pi-file-pdf" />
+                            </button>
                             <button className="btn btn-secondary btn-sm btn-icon" title="لوحة الطالب" onClick={() => navigate(`/students/${s.id}/dashboard`)}>
                               <i className="pi pi-chart-bar" />
                             </button>
@@ -463,6 +473,14 @@ export default function StudentsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Comprehensive Student Report for Parent Modal */}
+      {reportStudentId && (
+        <StudentReportModal
+          studentId={reportStudentId}
+          onClose={() => setReportStudentId(null)}
+        />
       )}
     </div>
   )

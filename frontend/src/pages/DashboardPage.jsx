@@ -11,10 +11,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const requests = {
-      students: can('students') ? getStudents({ per_page: 1 }) : Promise.resolve(null),
-      groups: can('groups') ? getGroups() : Promise.resolve(null),
-      sessions: can('sessions') ? getSessions({ all: true }) : Promise.resolve(null),
-      payments: can('payments') ? getPayments({ per_page: 1 }) : Promise.resolve(null)
+      students: can('students') ? getStudents({ per_page: 1, skipGlobalError: true }) : Promise.resolve(null),
+      groups: can('groups') ? getGroups({ skipGlobalError: true }) : Promise.resolve(null),
+      sessions: can('sessions') ? getSessions({ all: true, skipGlobalError: true }) : Promise.resolve(null),
+      payments: can('payments') ? getPayments({ per_page: 1, skipGlobalError: true }) : Promise.resolve(null)
     }
     Promise.allSettled(Object.values(requests)).then(results => {
       const [s, g, sess, p] = results.map(result => result.status === 'fulfilled' ? result.value : null)

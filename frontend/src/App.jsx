@@ -54,7 +54,7 @@ function AppRoutes() {
               : <DashboardPage />
           } />
           <Route path="teacher-dashboard" element={<ProtectedRoute teacherOnly><TeacherDashboardPage /></ProtectedRoute>} />
-          <Route path="admin" element={<ProtectedRoute teacherOnly><AdminDashboardPage /></ProtectedRoute>} />
+          <Route path="admin" element={<Navigate to="/teacher-dashboard" replace />} />
           <Route path="assistants" element={<ProtectedRoute teacherOnly><AssistantsPage /></ProtectedRoute>} />
           <Route path="assistant-info" element={<ProtectedRoute><AssistantInfoPage /></ProtectedRoute>} />
 

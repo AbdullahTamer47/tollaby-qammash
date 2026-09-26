@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { globalSearch } from '../api'
 import { useAuth } from '../context/AuthContext'
+import StudentReportModal from '../components/StudentReportModal'
 
 export default function SearchPage() {
   const { user } = useAuth()
@@ -10,6 +11,7 @@ export default function SearchPage() {
   
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [reportStudentId, setReportStudentId] = useState(null)
 
   useEffect(() => {
     if (!query) { setLoading(false); return }
@@ -56,14 +58,54 @@ export default function SearchPage() {
           <div className="card-header"><h2 className="card-title"><i className="pi pi-users" /> الطلاب ({data.students_count})</h2></div>
           <div className="table-container">
             <table>
-              <thead><tr><th>الرقم</th><th>الاسم</th><th>المجموعة</th><th>الحالة</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>الكود</th>
+                  <th>اسم الطالب</th>
+                  <th>هاتف الطالب</th>
+                  <th>هاتف ولي الأمر</th>
+                  <th>المجموعة</th>
+                  <th>الحالة</th>
+                  <th>إجراءات</th>
+                </tr>
+              </thead>
               <tbody>
                 {data.students.map(s => (
                   <tr key={s.id}>
-                    <td><span className="badge badge-info">{s.id}</span></td>
+                    <td><span className="badge badge-info">#{s.id}</span></td>
                     <td><Link to={`/students/${s.id}/dashboard`} style={{ color: '#42a5f5', textDecoration: 'none', fontWeight: 600 }}>{s.name}</Link></td>
+                    <td style={{ direction: 'ltr', textAlign: 'right' }}>{s.phoneNumber || '-'}</td>
+                    <td style={{ direction: 'ltr', textAlign: 'right' }}>
+                      {s.dadPhoneNumber ? (
+                        <a
+                          href={`https://wa.me/20${String(s.dadPhoneNumber).replace(/^0+/, '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: '#10b981', textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                          title="محادثة واتساب مباشرة"
+                        >
+                          <i className="pi pi-whatsapp" /> {s.dadPhoneNumber}
+                        </a>
+                      ) : '-'}
+                    </td>
                     <td>{s.group?.name}</td>
                     <td><span className={`badge badge-${s.active ? 'success' : 'danger'}`}>{s.active ? 'نشط' : 'غير نشط'}</span></td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={() => setReportStudentId(s.id)}
+                          style={{ background: '#0284c7', borderColor: '#0284c7', fontSize: '0.78rem', padding: '0.25rem 0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          title="تقرير المتابعة الشامل لولي الأمر"
+                        >
+                          <i className="pi pi-file-pdf" /> تقرير ولي الأمر
+                        </button>
+                        <Link to={`/students/${s.id}/dashboard`} className="btn btn-sm btn-secondary" style={{ fontSize: '0.78rem', padding: '0.25rem 0.6rem' }}>
+                          الملف
+                        </Link>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -174,6 +216,14 @@ export default function SearchPage() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Comprehensive Student Report for Parent Modal */}
+      {reportStudentId && (
+        <StudentReportModal
+          studentId={reportStudentId}
+          onClose={() => setReportStudentId(null)}
+        />
       )}
     </div>
   )

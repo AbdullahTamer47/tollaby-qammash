@@ -114,7 +114,7 @@ export default function TopBar({ user, onMenuToggle }) {
           ref={inputRef}
           value={searchQ}
           onChange={e => setSearchQ(e.target.value)}
-          placeholder="بحث شامل... (اسم / رقم / مجموعة)"
+          placeholder="بحث شامل... (اسم / كود / هاتف الطالب أو ولي الأمر)"
           type="text"
         />
       </form>

@@ -102,7 +102,15 @@ export default function LoginPage() {
       const res = await login({ username: usernameToLogin, password })
       setUser(res.data)
       await refreshUser().catch(() => res.data)
-      navigate(searchParams.get('redirect') || '/', { replace: true })
+      let targetRedirect = searchParams.get('redirect') || '/'
+      if (res.data?.role === 'assistant' && (
+        targetRedirect.includes('teacher-dashboard') ||
+        targetRedirect.includes('admin') ||
+        targetRedirect.includes('assistants')
+      )) {
+        targetRedirect = '/'
+      }
+      navigate(targetRedirect, { replace: true })
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'خطأ في كلمة المرور أو بيانات الدخول')
     } finally {

@@ -193,13 +193,13 @@ export const getChatWebhookEvents = () => api.get('/chat/webhook/events')
 export const sendChatMessage = (data) => api.post('/chat/messages/send', data)
 
 // Teacher
-export const getTeacherDashboard = () => api.get('/teacher/dashboard')
+export const getTeacherDashboard = (config = {}) => api.get('/teacher/dashboard', { skipGlobalError: true, ...config })
 
 // Assistant
-export const getAssistantInfo = () => api.get('/assistant/info')
+export const getAssistantInfo = (config = {}) => api.get('/assistant/info', config)
 
 // Admin
-export const getAdminStats = () => api.get('/admin/stats')
+export const getAdminStats = (config = {}) => api.get('/admin/stats', { skipGlobalError: true, ...config })
 
 // Notification Templates (DB-stored text templates)
 export const getNotificationTemplates = () => api.get('/notification-templates')

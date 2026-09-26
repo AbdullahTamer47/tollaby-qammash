@@ -6,11 +6,10 @@ import TopBar from './TopBar'
 
 const MENU_ITEMS = [
   { section: 'الرئيسية' },
-  { to: '/teacher-dashboard', icon: 'pi pi-chart-bar', label: 'لوحة المعلم', teacher: true },
-  { to: '/admin', icon: 'pi pi-chart-line', label: 'إحصائيات الإدارة', teacher: true },
-  { to: '/assistants', icon: 'pi pi-id-card', label: 'إدارة المساعدين', teacher: true },
+  { to: '/teacher-dashboard', icon: 'pi pi-chart-bar', label: 'لوحة التحكم والإحصائيات', teacher: true },
+  { to: '/assistants', icon: 'pi pi-users', label: 'إدارة المساعدين', teacher: true },
   { to: '/assistant-info', icon: 'pi pi-user', label: 'معلوماتي', assistant: true },
-  { to: '/students', icon: 'pi pi-users', label: 'الطلاب', perm: 'students' },
+  { to: '/students', icon: 'pi pi-user-plus', label: 'الطلاب', perm: 'students' },
   { to: '/groups', icon: 'pi pi-th-large', label: 'المجموعات', perm: 'groups' },
 
   { section: 'الحصص والحضور' },
@@ -22,8 +21,8 @@ const MENU_ITEMS = [
   { to: '/exams', icon: 'pi pi-pencil', label: 'الامتحانات', perm: 'exams' },
 
   { section: 'أدوات' },
-  { to: '/books', icon: 'pi pi-book', label: 'الكتب والحجوزات', perm: 'books' },
-  { to: '/qrcodes', icon: 'pi pi-qrcode', label: 'رموز QR', perm: 'students' },
+  { to: '/books', icon: 'pi pi-book', label: 'الكتب والمذكرات', perm: 'books' },
+  { to: '/qrcodes', icon: 'pi pi-id-card', label: 'كروت وهوية الطلاب (ID Cards)', perm: 'students' },
 ]
 
 

@@ -16,9 +16,18 @@ router.get('/', requireAuth, async (req, res) => {
   const isNumeric = !isNaN(numericId);
 
   try {
+    const studentWhere = {
+      OR: [
+        { name: { contains: q } },
+        ...(isNumeric ? [{ id: { equals: numericId } }] : []),
+        { phoneNumber: { contains: q } },
+        { dadPhoneNumber: { contains: q } }
+      ]
+    };
+
     const [students, groups, sessions, exams, paymentStudents, books] = await Promise.all([
       can('students') ? prisma.student.findMany({
-        where: { OR: [{ name: { contains: q } }, ...(isNumeric ? [{ id: { equals: numericId } }] : [])] },
+        where: studentWhere,
         include: { group: true, offer: true },
         orderBy: { id: 'asc' },
         take: 20
@@ -41,7 +50,7 @@ router.get('/', requireAuth, async (req, res) => {
         take: 20
       }) : Promise.resolve([]),
       can('payments') ? prisma.student.findMany({
-        where: { OR: [{ name: { contains: q } }, ...(isNumeric ? [{ id: { equals: numericId } }] : [])] },
+        where: studentWhere,
         include: {
           group: true,
           offer: true,

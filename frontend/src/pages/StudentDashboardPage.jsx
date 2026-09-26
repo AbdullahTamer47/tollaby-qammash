@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getStudentDashboard, changeStudentGroup, addPayment, toggleBooking, getStudentArchivedMessages } from '../api'
+import StudentReportModal from '../components/StudentReportModal'
 
 export default function StudentDashboardPage() {
   const { id } = useParams()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showReportModal, setShowReportModal] = useState(false)
   const [payModal, setPayModal] = useState(false)
   const [payForm, setPayForm] = useState({ amount: '', type: 'sessions' })
   const [deletePayModal, setDeletePayModal] = useState(null)
@@ -112,9 +114,17 @@ export default function StudentDashboardPage() {
             {student.group?.name} · {student.group?.grade}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setShowReportModal(true)}
+            style={{ background: '#0284c7', borderColor: '#0284c7', fontWeight: 600 }}
+          >
+            <i className="pi pi-file-pdf" /> تقرير ولي الأمر (واتساب / PDF)
+          </button>
           <Link to={`/qrcodes?student_id=${student.id}`} className="btn btn-secondary">
-            <i className="pi pi-qrcode" /> طباعة QR
+            <i className="pi pi-id-card" /> كارت الهوية
           </Link>
           <button className="btn btn-secondary" onClick={() => { setNewGroupId(student.groupId); setGroupModal(true) }}>
             <i className="pi pi-arrow-right-arrow-left" /> تغيير المجموعة
@@ -504,6 +514,13 @@ export default function StudentDashboardPage() {
         </div>
       )}
 
+      {/* Comprehensive Student Report for Parent Modal */}
+      {showReportModal && (
+        <StudentReportModal
+          studentId={id}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
     </div>
   )
 }

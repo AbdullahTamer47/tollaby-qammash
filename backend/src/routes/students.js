@@ -11,7 +11,14 @@ router.get('/', requirePermission('students'), async (req, res) => {
   const { q, page = 1, per_page = 15, groupId, active, grade, sex } = req.query;
   try {
     const where = {
-      ...(q && { OR: [{ name: { contains: q } }, { id: isNaN(q) ? undefined : { equals: parseInt(q) } }].filter(Boolean) }),
+      ...(q && {
+        OR: [
+          { name: { contains: q } },
+          { id: isNaN(q) ? undefined : { equals: parseInt(q) } },
+          { phoneNumber: { contains: q } },
+          { dadPhoneNumber: { contains: q } }
+        ].filter(Boolean)
+      }),
       ...(groupId && { groupId: parseInt(groupId) }),
       ...(active !== undefined && active !== '' && { active: active === 'true' }),
       ...(sex && { sex }),
