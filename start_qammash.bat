@@ -5,13 +5,13 @@ title منصة الأستاذ القماش
 :: فحص وتشغيل خادم الباك إند 5000
 netstat -ano | findstr :5000 >nul
 if %errorlevel% neq 0 (
-    start /min "Qammash Backend" cmd /c "cd /d D:\pro2\tollaby-v2\backend && node src\index.js"
+    start /min "Qammash Backend" cmd /c "cd /d ""%~dp0backend"" && node src\index.js"
 )
 
 :: فحص وتشغيل خادم الفرونت إند 5173
 netstat -ano | findstr :5173 >nul
 if %errorlevel% neq 0 (
-    start /min "Qammash Frontend" cmd /c "cd /d D:\pro2\tollaby-v2\frontend && npm run dev"
+    start /min "Qammash Frontend" cmd /c "cd /d ""%~dp0frontend"" && npm run dev"
 )
 
 :: انتظار ثانية واحدة ثم فتح المنصة في المتصفح
