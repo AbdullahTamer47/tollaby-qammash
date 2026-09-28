@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { getSessionAttendance, editSessionAttendance, scanAttendance } from '../api'
+import { getSessionAttendance, editSessionAttendance, scanAttendance, enqueueMutation } from '../api'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { exportToCSV } from '../utils/csvExport'
 import Pagination from '../components/Pagination'
@@ -221,10 +221,28 @@ export default function AttendancePage() {
         const queue = getOfflineQueue()
         queue.push({ studentId: cleanId, autoPay: autoPayRef.current, timestamp: Date.now() })
         saveOfflineQueue(queue)
+
+        // Enqueue to global sync manager
+        enqueueMutation('SCAN_ATTENDANCE', { sessionId: id, studentId: cleanId, autoPay: autoPayRef.current })
+
+        // Optimistically mark student present in state
+        let studentName = `طالب #${cleanId}`
+        setData(prev => {
+          if (!prev || !prev.attendance) return prev
+          const updated = prev.attendance.map(a => {
+            if (String(a.student.id) === cleanId || String(a.student.code) === cleanId) {
+              studentName = a.student.name
+              return { ...a, isAttendant: true }
+            }
+            return a
+          })
+          return { ...prev, attendance: updated }
+        })
+
         playSuccessBeep()
         setScanMsg({
           type: 'warning',
-          text: `⚠️ تم حفظ حضور الطالب #${cleanId} محلياً بدون نت — ستتم المزامنة تلقائياً`
+          text: `⚠️ تم تسجيل حضور ${studentName} محلياً بدون نت — سيتم الرفع تلقائياً عند عودة النت`
         })
       } else {
         playErrorBeep()

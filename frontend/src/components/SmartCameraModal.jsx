@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSessions, scanAttendance, addPayment, editSessionAttendance } from '../api'
+import { getSessions, scanAttendance, addPayment, editSessionAttendance, enqueueMutation } from '../api'
 
 // Audio Chime Synthesizer via Web Audio API (Zero latency, works offline)
 function playBeep(type = 'success') {
@@ -186,8 +186,26 @@ export default function SmartCameraModal({ mode = 'live_attendance', initialSess
         // Keep result until next scan or 10 seconds
       }, 10000)
     } catch (err) {
-      playBeep('error')
-      setScanError(err.response?.data?.message || err.response?.data?.error || 'الطالب غير مسجل في هذه المجموعة أو الحصة')
+      if (!window.navigator.onLine || !err.response) {
+        // Enqueue offline attendance mutation
+        enqueueMutation('SCAN_ATTENDANCE', { sessionId: selectedSessionId, studentId: cleanId, autoPay: true })
+        playBeep('success')
+        const timeStr = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+        setLastScannedResult({
+          studentId: cleanId,
+          studentName: `طالب #${cleanId} (حفظ أوفلاين)`,
+          groupName: selectedSession?.title || 'الحصة الحالية',
+          autoPaid: selectedSession?.price || 0,
+          time: timeStr,
+          price: selectedSession?.price || 0,
+          postponed: false,
+          customPaid: null,
+          offline: true
+        })
+      } else {
+        playBeep('error')
+        setScanError(err.response?.data?.message || err.response?.data?.error || 'الطالب غير مسجل في هذه المجموعة أو الحصة')
+      }
     }
   }
 

@@ -1,4 +1,14 @@
 import axios from 'axios'
+import {
+  setCachedData,
+  getCachedData,
+  initOfflineSyncWatcher,
+  syncOfflineQueue,
+  getOfflineQueue,
+  enqueueMutation,
+  clearOfflineQueue,
+  isDeviceOnline
+} from './utils/offlineEngine'
 
 export const isCapacitor = typeof window !== 'undefined' && (
   Boolean(window.Capacitor?.isNativePlatform?.()) ||
@@ -24,6 +34,13 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
+// Cache key generator for GET requests
+const makeCacheKey = (config) => {
+  const url = config.url || '';
+  const params = config.params ? JSON.stringify(config.params) : '';
+  return `${url}_${params}`;
+};
+
 // Automatically inject session token for mobile APK and cross-origin calls
 api.interceptors.request.use(config => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('qammash_token') : null;
@@ -41,11 +58,35 @@ export const setCustomServerUrl = (url) => {
 };
 
 api.interceptors.response.use(
-  response => response,
+  response => {
+    // Cache successful GET data locally
+    if (response.config?.method?.toLowerCase() === 'get' && response.data) {
+      setCachedData(makeCacheKey(response.config), response.data);
+    }
+    return response;
+  },
   error => {
     const isLoginRequest = error.config?.url?.includes('/auth/login');
     const skipAuthError = error.config?.skipAuthError;
     const skipGlobalError = error.config?.skipGlobalError;
+    const isGet = error.config?.method?.toLowerCase() === 'get';
+
+    // Offline Cache Fallback for GET requests
+    if (isGet && (!error.response || error.code === 'ERR_NETWORK')) {
+      const cached = getCachedData(makeCacheKey(error.config));
+      if (cached) {
+        window.dispatchEvent(new CustomEvent('offline-data-served', { detail: { url: error.config.url } }));
+        return Promise.resolve({
+          data: cached,
+          status: 200,
+          statusText: 'OK (Offline Cache)',
+          headers: {},
+          config: error.config,
+          _isOfflineCache: true
+        });
+      }
+    }
+
     if (error.response) {
       if (error.response.status === 401) {
         if (typeof window !== 'undefined') localStorage.removeItem('qammash_token');
@@ -60,11 +101,17 @@ api.interceptors.response.use(
         if (!skipGlobalError) window.dispatchEvent(new CustomEvent('api-error', { detail: error.response.data.error }));
       }
     } else if (!skipGlobalError) {
-      window.dispatchEvent(new CustomEvent('api-error', { detail: 'لا يمكن الاتصال بالخادم. تحقق من الإنترنت.' }));
+      window.dispatchEvent(new CustomEvent('api-error', { detail: 'لا يمكن الاتصال بالخادم. البرنامج يعمل حالياً بوضع الأوفلاين المحلي.' }));
     }
     return Promise.reject(error);
   }
 );
+
+// Initialize heartbeat and auto-sync on network reconnection
+initOfflineSyncWatcher(api);
+
+export { getOfflineQueue, enqueueMutation, syncOfflineQueue, clearOfflineQueue, isDeviceOnline };
+export const syncOfflineNow = () => syncOfflineQueue(api);
 
 // Auth
 export const login = async (data) => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getPayments, addPayment, getGroups } from '../api'
+import { getPayments, addPayment, getGroups, enqueueMutation } from '../api'
 import { exportToCSV } from '../utils/csvExport'
 import Pagination from '../components/Pagination'
 
@@ -58,7 +58,18 @@ export default function PaymentsPage() {
       setPaymentModal(null)
       load(state.page)
     } catch (err) {
-      setMsg({ type: 'error', text: err?.response?.data?.error || 'فشل إضافة الدفعة' })
+      if (!window.navigator.onLine || !err.response) {
+        enqueueMutation('ADD_PAYMENT', {
+          studentId: paymentModal.studentId,
+          amount: parseFloat(paymentForm.amount),
+          paymentType: paymentForm.type,
+          targetName: paymentForm.targetName
+        })
+        setMsg({ type: 'warning', text: `⚠️ تم حفظ دفعة بقيمة ${paymentForm.amount} ج.م محلياً بدون نت — ستتم المزامنة تلقائياً عند عودة النت` })
+        setPaymentModal(null)
+      } else {
+        setMsg({ type: 'error', text: err?.response?.data?.error || 'فشل إضافة الدفعة' })
+      }
     }
   }
 

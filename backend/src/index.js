@@ -71,7 +71,7 @@ app.use(cors({
 }));
 
 const { PrismaSessionStore } = require('@quixo3/prisma-session-store');
-const sessionStore = new PrismaSessionStore(
+const prismaSessionStore = new PrismaSessionStore(
   prisma,
   {
     checkPeriod: 2 * 60 * 1000,  // ms
@@ -81,6 +81,36 @@ const sessionStore = new PrismaSessionStore(
   }
 );
 
+// Offline-resilient session store: fall back to memory cache if DB connection is offline
+const memorySessionMap = new Map();
+const origGet = prismaSessionStore.get.bind(prismaSessionStore);
+const origSet = prismaSessionStore.set.bind(prismaSessionStore);
+const origDestroy = prismaSessionStore.destroy.bind(prismaSessionStore);
+
+prismaSessionStore.get = function(sid, callback) {
+  origGet(sid, (err, sess) => {
+    if (err || !sess) {
+      const mem = memorySessionMap.get(sid);
+      if (mem) return callback(null, mem);
+    }
+    if (sess) memorySessionMap.set(sid, sess);
+    callback(err, sess);
+  });
+};
+
+prismaSessionStore.set = function(sid, sess, callback) {
+  memorySessionMap.set(sid, sess);
+  origSet(sid, sess, (err) => {
+    if (err) console.warn('Offline session saved to local memory cache');
+    callback && callback(null);
+  });
+};
+
+prismaSessionStore.destroy = function(sid, callback) {
+  memorySessionMap.delete(sid);
+  origDestroy(sid, callback);
+};
+
 // Session
 const isProdOrVercel = isProduction || isVercel;
 app.use(session({
@@ -88,7 +118,7 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'secret',
   resave: false,
   saveUninitialized: false,
-  store: sessionStore,
+  store: prismaSessionStore,
   cookie: {
     httpOnly: true,
     secure: isProdOrVercel ? true : false,
@@ -161,6 +191,7 @@ app.use('/api/admin', require('./routes/admin'));
 app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/notification-templates', require('./routes/notificationTemplates'));
+app.use('/api/sync', require('./routes/sync'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 

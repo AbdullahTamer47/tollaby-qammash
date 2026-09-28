@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { getNetworkInfo } from '../api'
+import { getNetworkInfo, getOfflineQueue, syncOfflineNow } from '../api'
 import SmartCameraModal from './SmartCameraModal'
 
 export default function TopBar({ user, onMenuToggle }) {
   const [searchQ, setSearchQ] = useState('')
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [isSyncing, setIsSyncing] = useState(false)
   const [showConnectModal, setShowConnectModal] = useState(false)
   const [cameraModalMode, setCameraModalMode] = useState(null) // null | 'live_attendance' | 'search_lookup'
   const isCloudHost = typeof window !== 'undefined' && (
@@ -21,15 +23,44 @@ export default function TopBar({ user, onMenuToggle }) {
   const inputRef = useRef(null)
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
+    const updateStatus = () => {
+      setIsOnline(typeof window !== 'undefined' ? window.navigator.onLine : true)
+      setPendingCount(getOfflineQueue().length)
+    }
+    updateStatus()
+
+    const handleQueueChanged = (e) => setPendingCount(e.detail?.count ?? getOfflineQueue().length)
+    const handleSyncStarted = () => setIsSyncing(true)
+    const handleSynced = () => {
+      setIsSyncing(false)
+      setPendingCount(getOfflineQueue().length)
+    }
+
+    window.addEventListener('online', updateStatus)
+    window.addEventListener('offline', updateStatus)
+    window.addEventListener('offline-queue-changed', handleQueueChanged)
+    window.addEventListener('offline-sync-started', handleSyncStarted)
+    window.addEventListener('offline-synced', handleSynced)
+
     return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('online', updateStatus)
+      window.removeEventListener('offline', updateStatus)
+      window.removeEventListener('offline-queue-changed', handleQueueChanged)
+      window.removeEventListener('offline-sync-started', handleSyncStarted)
+      window.removeEventListener('offline-synced', handleSynced)
     }
   }, [])
+
+  const handleManualSync = async () => {
+    if (isSyncing || pendingCount === 0) return
+    setIsSyncing(true)
+    try {
+      await syncOfflineNow()
+    } finally {
+      setIsSyncing(false)
+      setPendingCount(getOfflineQueue().length)
+    }
+  }
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -167,24 +198,84 @@ export default function TopBar({ user, onMenuToggle }) {
           <span>ربط الموبايل</span>
         </button>
 
-        <span
-          title={isOnline ? 'متصل بالإنترنت والسحابة' : 'غير متصل بالإنترنت - يعمل على الشبكة المحلية فقط'}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            padding: '0.25rem 0.6rem',
-            borderRadius: '12px',
-            fontSize: '0.78rem',
-            fontWeight: 600,
-            background: isOnline ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.15)',
-            color: isOnline ? '#10b981' : '#b45309',
-            border: `1px solid ${isOnline ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`
-          }}
-        >
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isOnline ? '#10b981' : '#f59e0b' }} />
-          {isOnline ? 'متصل' : 'غير متصل'}
-        </span>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span
+            title={
+              !isOnline
+                ? 'أوفلاين: التطبيق يعمل بكفاءة بدون إنترنت ويحفظ العمليات محلياً'
+                : pendingCount > 0
+                  ? `يوجد ${pendingCount} عمليات محفوظة محلياً بانتظار المزامنة`
+                  : 'متصل بالسيرفر والسحابة'
+            }
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0.28rem 0.65rem',
+              borderRadius: '14px',
+              fontSize: '0.78rem',
+              fontWeight: 600,
+              background: !isOnline
+                ? 'rgba(239, 68, 68, 0.12)'
+                : pendingCount > 0
+                  ? 'rgba(245, 158, 11, 0.15)'
+                  : 'rgba(16, 185, 129, 0.12)',
+              color: !isOnline
+                ? '#ef4444'
+                : pendingCount > 0
+                  ? '#d97706'
+                  : '#10b981',
+              border: `1px solid ${
+                !isOnline
+                  ? 'rgba(239, 68, 68, 0.25)'
+                  : pendingCount > 0
+                    ? 'rgba(245, 158, 11, 0.3)'
+                    : 'rgba(16, 185, 129, 0.25)'
+              }`
+            }}
+          >
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: !isOnline ? '#ef4444' : pendingCount > 0 ? '#f59e0b' : '#10b981'
+              }}
+            />
+            <span>
+              {!isOnline
+                ? `أوفلاين ${pendingCount > 0 ? `(${pendingCount} معلق)` : ''}`
+                : pendingCount > 0
+                  ? `${pendingCount} معلق`
+                  : 'متصل'}
+            </span>
+          </span>
+
+          {pendingCount > 0 && isOnline && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={handleManualSync}
+              disabled={isSyncing}
+              title="مزامنة التغييرات المعلقة مع السيرفر فوراً"
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: '#fff',
+                fontSize: '0.75rem',
+                padding: '0.25rem 0.55rem',
+                borderRadius: '12px',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.25rem'
+              }}
+            >
+              <i className={`pi ${isSyncing ? 'pi-spin pi-spinner' : 'pi-sync'}`} style={{ fontSize: '0.75rem' }} />
+              <span>{isSyncing ? 'جاري...' : 'مزامنة'}</span>
+            </button>
+          )}
+        </div>
 
         <span style={{ color: 'var(--text-color-secondary)', fontSize: '0.85rem' }}>
           {user?.role === 'teacher' ? '👨‍🏫 معلم' : '🧑‍💼 مساعد'}
