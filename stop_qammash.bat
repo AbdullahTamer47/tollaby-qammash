@@ -1,8 +1,8 @@
 @echo off
-chcp 65001 >nul
-title إيقاف منصة الأستاذ القماش
+title Stopping Tollaby Platform
+
 echo ==============================================
-echo   جاري إيقاف جميع خوادم منصة الأستاذ القماش...
+echo   Stopping Tollaby Platform servers...
 echo ==============================================
 
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr /R /C:":5000\>"') do (
@@ -14,6 +14,6 @@ for /f "tokens=5" %%a in ('netstat -aon ^| findstr /R /C:":5173\>"') do (
 )
 
 echo.
-echo تم إيقاف جميع الخوادم بنجاح!
-timeout /t 2 >nul
+echo All servers have been stopped successfully.
+ping 127.0.0.1 -n 3 >nul
 exit

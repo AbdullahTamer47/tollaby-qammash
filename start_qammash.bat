@@ -1,49 +1,46 @@
 @echo off
-chcp 65001 >nul
-title منصة الأستاذ محمد القماش
+title Tollaby Platform - Mr. Mohamed Al-Qammash
 
-echo ===================================================
-echo     جاري تشغيل منصة الأستاذ محمد القماش...
-echo ===================================================
+echo ========================================================
+echo   Starting Tollaby Platform - Mr. Mohamed Al-Qammash...
+echo ========================================================
 
-:: 1. تشغيل خادم الباك إند (Port 5000)
+REM 1. Start Backend Server on Port 5000 if not running
 netstat -ano | findstr /R /C:":5000\>" >nul
 if %errorlevel% neq 0 (
-    echo [1/3] تشغيل خادم البيانات (Backend)...
-    start /min "Qammash Backend" cmd /c "cd /d "%~dp0backend" && node src\index.js"
+    echo [1/3] Launching Backend Server...
+    start "Tollaby Backend" /D "%~dp0backend" /min cmd /c "node src\index.js"
 ) else (
-    echo [1/3] خادم البيانات يعمل بالفعل.
+    echo [1/3] Backend Server is already running.
 )
 
-:: 2. تشغيل واجهة النظام (Port 5173)
+REM 2. Start Frontend Server on Port 5173 if not running
 netstat -ano | findstr /R /C:":5173\>" >nul
 if %errorlevel% neq 0 (
-    echo [2/3] تشغيل واجهة المنصة (Frontend)...
-    start /min "Qammash Frontend" cmd /c "cd /d "%~dp0frontend" && npm.cmd run dev"
+    echo [2/3] Launching Frontend Server...
+    start "Tollaby Frontend" /D "%~dp0frontend" /min cmd /c "npm.cmd run dev"
 ) else (
-    echo [2/3] واجهة المنصة تعمل بالفعل.
+    echo [2/3] Frontend Server is already running.
 )
 
-:: 3. الانتظار الذكي حتى تصبح المنصة جاهزة
-echo [3/3] جاري فحص جاهزية المنصة...
+REM 3. Smart wait until Frontend is ready on Port 5173
+echo [3/3] Waiting for platform to be ready...
 set /a attempts=0
 :WAIT_LOOP
-timeout /t 1 /nobreak >nul
+ping 127.0.0.1 -n 2 >nul
 netstat -ano | findstr /R /C:":5173\>" >nul
 if %errorlevel% neq 0 (
     set /a attempts+=1
-    if %attempts% lss 25 (
+    if %attempts% lss 30 (
         goto WAIT_LOOP
     )
 )
 
-:: انتظار ثانية إضافية للتأكد من اكتمال استجابة السيرفر
-timeout /t 2 /nobreak >nul
+ping 127.0.0.1 -n 3 >nul
 
-:: رابط المنصة (HTTPS)
 set APP_URL=https://localhost:5173
 
-:: محاولة فتح Chrome في وضع التطبيق المستقل وبدون أخطاء شهادة
+REM Try Google Chrome in App Mode
 if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
     start "" "%ProgramFiles%\Google\Chrome\Application\chrome.exe" --ignore-certificate-errors --app=%APP_URL%
     exit
@@ -57,7 +54,7 @@ if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" (
     exit
 )
 
-:: محاولة فتح Microsoft Edge
+REM Try Microsoft Edge in App Mode
 if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
     start "" "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" --ignore-certificate-errors --app=%APP_URL%
     exit
@@ -67,6 +64,6 @@ if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
     exit
 )
 
-:: فتح المتصفح الافتراضي كخيار أخير
+REM Fallback to Default Browser
 start "" "%APP_URL%"
 exit
