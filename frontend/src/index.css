@@ -1377,3 +1377,57 @@ tbody tr:last-child td { border-bottom: none; }
   }
 }
 
+/* ========================================================
+   GLOBAL PRINT RULES - Completely hide layout chrome on print
+   ======================================================== */
+@media print {
+  .no-print,
+  .mobile-bottom-nav,
+  .layout-sidebar,
+  .layout-topbar,
+  .menu-btn-toggle,
+  .menu-btn-profile,
+  .menu-btn-logout,
+  .topbar-left,
+  .topbar-right,
+  .topbar-search,
+  .p-toast,
+  .toast,
+  nav,
+  aside,
+  header {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    left: -9999px !important;
+    top: -9999px !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .layout-wrapper {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  .layout-main-container,
+  .layout-main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+}
+

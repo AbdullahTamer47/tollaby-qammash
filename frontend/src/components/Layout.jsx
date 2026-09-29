@@ -57,7 +57,7 @@ export default function Layout() {
   return (
     <div className="layout-wrapper">
       {/* Sidebar */}
-      <aside className={`layout-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <aside className={`layout-sidebar ${sidebarOpen ? 'open' : ''} no-print`}>
         <div className="layout-sidebar-logo">
           <div className="logo-icon"><i className="pi pi-graduation-cap" /></div>
           <span>الأستاذ القماش</span>
@@ -121,7 +121,7 @@ export default function Layout() {
       </div>
 
       {/* Mobile Bottom Navigation Bar (App Experience) */}
-      <nav className="mobile-bottom-nav">
+      <nav className="mobile-bottom-nav no-print">
         <NavLink
           to={user?.role === 'teacher' ? '/teacher-dashboard' : '/sessions'}
           className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
@@ -170,6 +170,7 @@ export default function Layout() {
       {/* Overlay for mobile */}
       {sidebarOpen && (
         <div
+          className="no-print"
           style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'rgba(0,0,0,0.5)' }}
           onClick={() => setSidebarOpen(false)}
         />

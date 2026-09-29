@@ -466,8 +466,13 @@ export default function QRCodesPage() {
                 color: #000000 !important;
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
               }
-              .no-print, .layout-sidebar, .layout-topbar, .menu-btn-toggle, .print-status-tag, .selection-checkbox {
+              .no-print, .mobile-bottom-nav, .layout-sidebar, .layout-topbar, .menu-btn-toggle, .print-status-tag, .selection-checkbox, nav, aside, header {
                 display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                height: 0 !important;
+                width: 0 !important;
+                overflow: hidden !important;
               }
               .layout-main-container, .layout-main {
                 margin: 0 !important;

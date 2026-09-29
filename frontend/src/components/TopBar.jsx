@@ -130,7 +130,7 @@ export default function TopBar({ user, onMenuToggle }) {
   }
 
   return (
-    <header className="layout-topbar">
+    <header className="layout-topbar no-print">
       <div className="topbar-left">
         <button
           className="menu-btn-toggle"
