@@ -72,7 +72,7 @@ api.interceptors.response.use(
     const isGet = error.config?.method?.toLowerCase() === 'get';
 
     // Offline Cache Fallback for GET requests
-    if (isGet && (!error.response || error.code === 'ERR_NETWORK')) {
+    if (isGet && (!error.response || error.code === 'ERR_NETWORK' || error.response?.status >= 500)) {
       const cached = getCachedData(makeCacheKey(error.config));
       if (cached) {
         window.dispatchEvent(new CustomEvent('offline-data-served', { detail: { url: error.config.url } }));

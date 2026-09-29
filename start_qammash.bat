@@ -5,8 +5,8 @@ echo ========================================================
 echo   Starting Tollaby Platform - Mr. Mohamed Al-Qammash...
 echo ========================================================
 
-REM 1. Start Backend Server on Port 5000 if not running
-netstat -ano | findstr /R /C:":5000\>" >nul
+REM 1. Check if backend is LISTENING on Port 5000
+netstat -ano -p tcp | findstr /R /C:":5000 .*LISTENING" >nul
 if %errorlevel% neq 0 (
     echo [1/3] Launching Backend Server...
     start "Tollaby Backend" /D "%~dp0backend" /min cmd /c "node src\index.js"
@@ -14,8 +14,8 @@ if %errorlevel% neq 0 (
     echo [1/3] Backend Server is already running.
 )
 
-REM 2. Start Frontend Server on Port 5173 if not running
-netstat -ano | findstr /R /C:":5173\>" >nul
+REM 2. Check if frontend is LISTENING on Port 5173
+netstat -ano -p tcp | findstr /R /C:":5173 .*LISTENING" >nul
 if %errorlevel% neq 0 (
     echo [2/3] Launching Frontend Server...
     start "Tollaby Frontend" /D "%~dp0frontend" /min cmd /c "npm.cmd run dev"
@@ -23,20 +23,20 @@ if %errorlevel% neq 0 (
     echo [2/3] Frontend Server is already running.
 )
 
-REM 3. Smart wait until Frontend is ready on Port 5173
+REM 3. Wait until Frontend is actually LISTENING on Port 5173
 echo [3/3] Waiting for platform to be ready...
 set /a attempts=0
 :WAIT_LOOP
 ping 127.0.0.1 -n 2 >nul
-netstat -ano | findstr /R /C:":5173\>" >nul
+netstat -ano -p tcp | findstr /R /C:":5173 .*LISTENING" >nul
 if %errorlevel% neq 0 (
     set /a attempts+=1
-    if %attempts% lss 30 (
+    if %attempts% lss 35 (
         goto WAIT_LOOP
     )
 )
 
-ping 127.0.0.1 -n 3 >nul
+ping 127.0.0.1 -n 2 >nul
 
 set APP_URL=https://localhost:5173
 

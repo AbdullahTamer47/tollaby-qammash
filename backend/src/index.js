@@ -88,13 +88,17 @@ const origSet = prismaSessionStore.set.bind(prismaSessionStore);
 const origDestroy = prismaSessionStore.destroy.bind(prismaSessionStore);
 
 prismaSessionStore.get = function(sid, callback) {
+  const mem = memorySessionMap.get(sid);
   origGet(sid, (err, sess) => {
-    if (err || !sess) {
-      const mem = memorySessionMap.get(sid);
-      if (mem) return callback(null, mem);
+    if (err) {
+      // In offline mode or DB error, suppress error so express-session does not crash with 500
+      return callback(null, mem || null);
     }
-    if (sess) memorySessionMap.set(sid, sess);
-    callback(err, sess);
+    if (sess) {
+      memorySessionMap.set(sid, sess);
+      return callback(null, sess);
+    }
+    callback(null, mem || null);
   });
 };
 
@@ -108,7 +112,9 @@ prismaSessionStore.set = function(sid, sess, callback) {
 
 prismaSessionStore.destroy = function(sid, callback) {
   memorySessionMap.delete(sid);
-  origDestroy(sid, callback);
+  origDestroy(sid, (err) => {
+    callback && callback(null);
+  });
 };
 
 // Session
@@ -131,7 +137,7 @@ app.use(session({
 app.use((req, res, next) => {
   const token = req.headers['x-session-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '');
   if (token && (!req.session || !req.session.userId)) {
-    sessionStore.get(token, (err, sess) => {
+    prismaSessionStore.get(token, (err, sess) => {
       if (!err && sess && sess.userId) {
         req.session = Object.assign(req.session || {}, sess);
         req.sessionID = token;
