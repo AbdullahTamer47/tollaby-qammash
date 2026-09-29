@@ -102,27 +102,61 @@ router.get('/me', async (req, res) => {
 
 // PUT /api/auth/me
 router.put('/me', async (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
-  const { username, password } = req.body;
+  if (!req.session.userId) return res.status(401).json({ error: 'غير مصرح لك بالدخول' });
+  const { username, password, currentPassword } = req.body;
   const prisma = req.app.locals.prisma;
+
   try {
-    const dataToUpdate = { username };
-    if (password) {
-      dataToUpdate.password = await bcrypt.hash(password, 10);
+    const existing = await prisma.user.findUnique({ where: { id: req.session.userId } });
+    if (!existing) return res.status(404).json({ error: 'المستخدم غير موجود' });
+
+    // If current password provided, verify it first
+    if (currentPassword) {
+      let valid = await bcrypt.compare(currentPassword, existing.password);
+      if (!valid && typeof currentPassword === 'string') {
+        valid = await bcrypt.compare(currentPassword.trim(), existing.password);
+      }
+      if (!valid) {
+        return res.status(400).json({ error: 'كلمة المرور الحالية غير صحيحة' });
+      }
     }
-    const user = await prisma.user.update({
+
+    const dataToUpdate = {};
+    if (username && typeof username === 'string' && username.trim() && username.trim() !== existing.username) {
+      dataToUpdate.username = username.trim();
+    }
+    if (password && typeof password === 'string' && password.trim()) {
+      if (password.trim().length < 4) {
+        return res.status(400).json({ error: 'كلمة المرور يجب أن لا تقل عن 4 أحرف' });
+      }
+      dataToUpdate.password = await bcrypt.hash(password.trim(), 10);
+    }
+
+    if (Object.keys(dataToUpdate).length === 0) {
+      return res.json({ id: existing.id, username: existing.username, role: existing.role, message: 'لا توجد تغييرات' });
+    }
+
+    const updated = await prisma.user.update({
       where: { id: req.session.userId },
       data: dataToUpdate,
       select: { id: true, username: true, role: true }
     });
-    req.session.username = user.username;
+
+    req.session.username = updated.username;
     await prisma.actionLog.create({
-      data: { userId: req.session.userId, action: `تعديل بيانات الحساب`, path: req.originalUrl, method: 'PUT' }
+      data: {
+        userId: req.session.userId,
+        action: dataToUpdate.password ? 'تغيير كلمة المرور وتحديث الحساب' : 'تعديل اسم المستخدم',
+        path: req.originalUrl,
+        method: 'PUT'
+      }
     });
-    res.json(user);
+
+    res.json(updated);
   } catch (err) {
-    if (err.code === 'P2002') return res.status(400).json({ error: 'اسم المستخدم موجود بالفعل' });
-    res.status(500).json({ error: 'Server error' });
+    console.error('Update me error:', err);
+    if (err.code === 'P2002') return res.status(400).json({ error: 'اسم المستخدم موجود بالفعل، يرجى اختيار اسم آخر' });
+    res.status(500).json({ error: 'حدث خطأ في الخادم أثناء تحديث البيانات' });
   }
 });
 

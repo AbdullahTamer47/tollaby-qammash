@@ -1,14 +1,14 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { logout, updateMe } from '../api'
+import { logout } from '../api'
 import TopBar from './TopBar'
 
 const MENU_ITEMS = [
   { section: 'الرئيسية' },
   { to: '/teacher-dashboard', icon: 'pi pi-chart-bar', label: 'لوحة التحكم والإحصائيات', teacher: true },
   { to: '/assistants', icon: 'pi pi-users', label: 'إدارة المساعدين', teacher: true },
-  { to: '/assistant-info', icon: 'pi pi-user', label: 'معلوماتي', assistant: true },
+  { to: '/profile', icon: 'pi pi-user-edit', label: 'حسابي وكلمة المرور' },
   { to: '/students', icon: 'pi pi-user-plus', label: 'الطلاب', perm: 'students' },
   { to: '/groups', icon: 'pi pi-th-large', label: 'المجموعات', perm: 'groups' },
 
@@ -25,38 +25,15 @@ const MENU_ITEMS = [
   { to: '/qrcodes', icon: 'pi pi-id-card', label: 'كروت وهوية الطلاب (ID Cards)', perm: 'students' },
 ]
 
-
 export default function Layout() {
   const { user, setUser } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
- 
-  const [profileForm, setProfileForm] = useState({ username: '', password: '' })
-  const [msg, setMsg] = useState(null)
 
   const handleLogout = async () => {
     await logout().catch(() => {})
     setUser(null)
     navigate('/login')
-  }
-
-  const handleOpenEditProfile = () => {
-    setProfileForm({ username: user?.username || '', password: '' })
-    setMsg(null)
-    
-    setSidebarOpen(false)
-  }
-
-  const handleSaveProfile = async (e) => {
-    e.preventDefault()
-    try {
-      const res = await updateMe(profileForm)
-      setUser({ ...user, username: res.data.username })
-      setMsg({ type: 'success', text: 'تم تحديث البيانات بنجاح' })
-      setTimeout(() => setEditProfileModal(false), 1500)
-    } catch (err) {
-      setMsg({ type: 'error', text: err.response?.data?.error || 'حدث خطأ' })
-    }
   }
 
   const visibleItems = MENU_ITEMS.filter(item => {
@@ -105,6 +82,28 @@ export default function Layout() {
           )}
 
           <li style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--surface-border)' }}>
+            <NavLink
+              to="/profile"
+              className={({ isActive }) => `menu-btn-profile ${isActive ? 'active' : ''}`}
+              onClick={() => setSidebarOpen(false)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                padding: '0.65rem 0.85rem',
+                borderRadius: '8px',
+                color: 'var(--text-color)',
+                marginBottom: '0.5rem',
+                textDecoration: 'none',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                background: 'rgba(37,99,235,0.08)',
+                border: '1px solid rgba(37,99,235,0.2)'
+              }}
+            >
+              <i className="pi pi-key" style={{ color: 'var(--primary-color)' }} />
+              <span>تغيير كلمة المرور</span>
+            </NavLink>
             <button className="menu-btn" onClick={handleLogout}>
               <i className="pi pi-sign-out" />
               تسجيل الخروج

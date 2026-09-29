@@ -277,13 +277,31 @@ export default function TopBar({ user, onMenuToggle }) {
           )}
         </div>
 
-        <span style={{ color: 'var(--text-color-secondary)', fontSize: '0.85rem' }}>
-          {user?.role === 'teacher' ? '👨‍🏫 معلم' : '🧑‍💼 مساعد'}
-        </span>
-
-        <div className="topbar-avatar" title={user?.username}>
-          {user?.username?.[0]?.toUpperCase() || 'U'}
-        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
+          title="إعدادات الحساب وتغيير كلمة المرور"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '0.2rem 0.4rem',
+            borderRadius: '8px',
+            transition: 'background 0.2s'
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'none'}
+        >
+          <span style={{ color: 'var(--text-color-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
+            {user?.role === 'teacher' ? '👨‍🏫 مستر محمد' : `🧑‍💼 ${user?.username || 'مساعد'}`}
+          </span>
+          <div className="topbar-avatar" title={`حساب ${user?.username} - انقر لتغيير كلمة المرور`}>
+            {user?.role === 'teacher' ? '👨‍🏫' : (user?.username?.[0]?.toUpperCase() || 'U')}
+          </div>
+        </button>
       </div>
 
       {/* Modal: Connect Mobile */}

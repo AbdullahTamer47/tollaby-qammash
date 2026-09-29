@@ -8,6 +8,7 @@ const LoginPage = lazy(() => import('./pages/LoginPage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
 const TeacherDashboardPage = lazy(() => import('./pages/TeacherDashboardPage'))
 const AssistantInfoPage = lazy(() => import('./pages/AssistantInfoPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const StudentsPage = lazy(() => import('./pages/StudentsPage'))
 const StudentDashboardPage = lazy(() => import('./pages/StudentDashboardPage'))
 const GroupsPage = lazy(() => import('./pages/GroupsPage'))
@@ -57,6 +58,7 @@ function AppRoutes() {
           <Route path="admin" element={<Navigate to="/teacher-dashboard" replace />} />
           <Route path="assistants" element={<ProtectedRoute teacherOnly><AssistantsPage /></ProtectedRoute>} />
           <Route path="assistant-info" element={<ProtectedRoute><AssistantInfoPage /></ProtectedRoute>} />
+          <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
           <Route path="students" element={<ProtectedRoute permission="students"><StudentsPage /></ProtectedRoute>} />
           <Route path="students/:id/dashboard" element={<ProtectedRoute permission="students"><StudentDashboardPage /></ProtectedRoute>} />
