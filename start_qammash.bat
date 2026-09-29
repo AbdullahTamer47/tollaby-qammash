@@ -8,8 +8,8 @@ echo ========================================================
 REM 1. Check if backend is LISTENING on Port 5000
 netstat -ano -p tcp | findstr /R /C:":5000 .*LISTENING" >nul
 if %errorlevel% neq 0 (
-    echo [1/3] Launching Backend Server...
-    start "Tollaby Backend" /D "%~dp0backend" /min cmd /c "node src\index.js"
+    echo [1/3] Launching Backend Server with Auto-Restart Guard...
+    start "Tollaby Backend" /D "%~dp0backend" /min cmd /c "run_backend.bat"
 ) else (
     echo [1/3] Backend Server is already running.
 )

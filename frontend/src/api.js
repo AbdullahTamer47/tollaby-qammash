@@ -57,6 +57,17 @@ export const setCustomServerUrl = (url) => {
   api.defaults.baseURL = `${clean}/api`;
 };
 
+// Persistent error throttle state across concurrent API calls
+let lastGlobalErrorMsg = '';
+let lastGlobalErrorTime = 0;
+const dispatchThrottledApiError = (msg) => {
+  const now = Date.now();
+  if (msg === lastGlobalErrorMsg && now - lastGlobalErrorTime < 3000) return;
+  lastGlobalErrorMsg = msg;
+  lastGlobalErrorTime = now;
+  window.dispatchEvent(new CustomEvent('api-error', { detail: msg }));
+};
+
 api.interceptors.response.use(
   response => {
     // Cache successful GET data locally
@@ -86,7 +97,6 @@ api.interceptors.response.use(
         });
       }
     }
-
     if (error.response) {
       if (error.response.status === 401) {
         if (typeof window !== 'undefined') localStorage.removeItem('qammash_token');
@@ -94,14 +104,14 @@ api.interceptors.response.use(
           window.dispatchEvent(new CustomEvent('api-auth-error'));
         }
       } else if (error.response.status === 403) {
-        if (!skipGlobalError) window.dispatchEvent(new CustomEvent('api-error', { detail: 'غير مصرح لك للقيام بهذا الإجراء' }));
+        if (!skipGlobalError) dispatchThrottledApiError('غير مصرح لك للقيام بهذا الإجراء');
       } else if (error.response.status >= 500) {
-        if (!skipGlobalError) window.dispatchEvent(new CustomEvent('api-error', { detail: 'حدث خطأ في الخادم (500)' }));
+        if (!skipGlobalError) dispatchThrottledApiError('حدث خطأ في الخادم (500)');
       } else if (error.response.data && error.response.data.error) {
-        if (!skipGlobalError) window.dispatchEvent(new CustomEvent('api-error', { detail: error.response.data.error }));
+        if (!skipGlobalError) dispatchThrottledApiError(error.response.data.error);
       }
     } else if (!skipGlobalError) {
-      window.dispatchEvent(new CustomEvent('api-error', { detail: 'لا يمكن الاتصال بالخادم. البرنامج يعمل حالياً بوضع الأوفلاين المحلي.' }));
+      dispatchThrottledApiError('لا يمكن الاتصال بالخادم. البرنامج يعمل حالياً بوضع الأوفلاين المحلي.');
     }
     return Promise.reject(error);
   }

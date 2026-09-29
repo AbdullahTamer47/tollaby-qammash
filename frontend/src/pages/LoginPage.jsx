@@ -100,6 +100,9 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await login({ username: usernameToLogin, password })
+      if (res.data?.token) {
+        localStorage.setItem('qammash_token', res.data.token)
+      }
       setUser(res.data)
       await refreshUser().catch(() => res.data)
       let targetRedirect = searchParams.get('redirect') || '/'

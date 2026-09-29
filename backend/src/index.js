@@ -1,5 +1,14 @@
 require('dotenv').config();
 
+// Global crash protection for offline network drops and database reconnections
+process.on('unhandledRejection', (reason, promise) => {
+  console.warn('⚠️ Guarded unhandled rejection (offline resilience):', reason?.message || reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ Guarded uncaught exception (offline resilience):', err?.message || err);
+});
+
 // Default cloud database & session secret fallbacks for zero-config cloud deployment
 const DEFAULT_DATABASE_URL = "postgresql://neondb_owner:npg_EY5GmxONt4yF@ep-young-union-abwr6fhi-pooler.eu-west-2.aws.neon.tech/tollabytestDB?sslmode=require&channel_binding=require";
 const DEFAULT_SESSION_SECRET = "RhZa58RuanU8hOaJwDNVIhpm6kgtDGxXrD1CD91HyayJl";
@@ -74,7 +83,7 @@ const { PrismaSessionStore } = require('@quixo3/prisma-session-store');
 const prismaSessionStore = new PrismaSessionStore(
   prisma,
   {
-    checkPeriod: 2 * 60 * 1000,  // ms
+    checkPeriod: isVercel ? 0 : 5 * 60 * 1000,  // ms - only periodic cleanup on server
     dbRecordIdIsSessionId: true,
     dbRecordIdFunction: undefined,
     sessionModelName: 'sessionStore',
@@ -117,8 +126,8 @@ prismaSessionStore.destroy = function(sid, callback) {
   });
 };
 
-// Session
-const isProdOrVercel = isProduction || isVercel;
+// Session: only use secure cookies when running on Vercel HTTPS; local development / LAN works seamlessly on HTTP
+const isCookieSecure = isVercel;
 app.use(session({
   name: 'tollaby.sid',
   secret: process.env.SESSION_SECRET || 'secret',
@@ -127,8 +136,8 @@ app.use(session({
   store: prismaSessionStore,
   cookie: {
     httpOnly: true,
-    secure: isProdOrVercel ? true : false,
-    sameSite: isProdOrVercel ? 'none' : 'lax',
+    secure: isCookieSecure ? true : false,
+    sameSite: isCookieSecure ? 'none' : 'lax',
     maxAge: 1000 * 60 * 60 * 24, // 1 day
   }
 }));
