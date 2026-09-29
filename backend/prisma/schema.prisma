@@ -54,6 +54,7 @@ model Student {
   groupId       Int
   offerId       Int
   active        Boolean        @default(false)
+  cardPrinted   Boolean        @default(false)
   group         Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
   offer         Offer          @relation(fields: [offerId], references: [id], onDelete: Restrict)
   attendance    Attendance[]
@@ -61,6 +62,9 @@ model Student {
   studentDegrees StudentDegree[]
   bookBookings  BookBooking[]
   chatMessages  ChatMessage[]
+
+  @@index([groupId])
+  @@index([phoneNumber])
 }
 
 model Session {

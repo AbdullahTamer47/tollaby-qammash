@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { registerSW } from 'virtual:pwa-register'
 import App from './App.jsx'
 
 // PrimeReact
@@ -21,19 +22,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </React.StrictMode>
 )
 
-// Register Service Worker for Offline PWA Support
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator && (
-  window.location.protocol === 'https:' ||
-  window.location.hostname === 'localhost' ||
-  window.location.hostname === '127.0.0.1' ||
-  Boolean(window.isSecureContext)
-)) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(reg => {
-      console.log('🚀 Tollaby ServiceWorker active:', reg.scope)
-    }).catch(err => {
-      console.warn('ServiceWorker registration error:', err)
-    })
-  })
-}
+// Register Service Worker for Offline PWA Support via vite-plugin-pwa
+
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    console.log('🔄 يوجد تحديث جديد للمنظومة، سيتم تطبيقه تلقائياً')
+    updateSW(true)
+  },
+  onOfflineReady() {
+    console.log('✅ التطبيق جاهز تماماً للعمل بدون إنترنت (Offline Ready)')
+  }
+})
 

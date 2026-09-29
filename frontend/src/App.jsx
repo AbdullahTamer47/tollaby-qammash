@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { lazy, Suspense, useRef, useEffect } from 'react'
+import { lazy, Suspense, useRef, useEffect, useState } from 'react'
 import { Toast } from 'primereact/toast'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
@@ -90,8 +90,14 @@ function AppRoutes() {
 
 export default function App() {
   const toast = useRef(null)
+  const [isOffline, setIsOffline] = useState(!navigator.onLine)
 
   useEffect(() => {
+    const handleOnline = () => setIsOffline(false)
+    const handleOffline = () => setIsOffline(true)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
     const handleError = (e) => {
       if (toast.current) {
         toast.current.show({ severity: 'error', summary: 'خطأ', detail: e.detail || 'حدث خطأ غير متوقع', life: 5000 })
@@ -108,6 +114,8 @@ export default function App() {
     window.addEventListener('api-auth-error', handleAuthError)
 
     return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
       window.removeEventListener('api-error', handleError)
       window.removeEventListener('api-auth-error', handleAuthError)
     }
@@ -115,6 +123,27 @@ export default function App() {
 
   return (
     <AuthProvider>
+      {isOffline && (
+        <div style={{
+          background: 'linear-gradient(90deg, #b91c1c, #dc2626)',
+          color: '#ffffff',
+          textAlign: 'center',
+          padding: '0.5rem 1rem',
+          fontSize: '0.88rem',
+          fontWeight: 700,
+          zIndex: 99999,
+          position: 'sticky',
+          top: 0,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem'
+        }}>
+          <i className="pi pi-exclamation-triangle" style={{ fontSize: '1rem' }} />
+          <span>أنت الآن في وضع عدم الاتصال (Offline) - التطبيق يعمل من الذاكرة المؤقتة (PWA Cache)</span>
+        </div>
+      )}
       <Toast ref={toast} position="bottom-left" />
       <AppRoutes />
     </AuthProvider>

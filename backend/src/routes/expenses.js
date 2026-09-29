@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 const { logAction } = require('../utils/logAction');
+const { isDbConnectionError, cache: localCache, enqueueOfflineMutation, persistCache } = require('../utils/localDBSnapshot');
 
 // Helper to check permission for expenses (teacher or permission 'expenses' or 'payments')
 function canManageExpenses(req) {
@@ -52,6 +53,23 @@ router.get('/summary', async (req, res) => {
       byCategory
     });
   } catch (err) {
+    if (isDbConnectionError(err)) {
+      console.warn('⚡ DB offline: Serving expenses summary from local cache');
+      const expenses = localCache.expenses || [];
+      const totalAmount = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+      const byCategory = {};
+      expenses.forEach(e => {
+        byCategory[e.category] = (byCategory[e.category] || 0) + (e.amount || 0);
+      });
+      return res.json({
+        totalAmount,
+        totalCount: expenses.length,
+        thisMonthAmount: totalAmount,
+        thisMonthCount: expenses.length,
+        byCategory,
+        isOfflineFallback: true
+      });
+    }
     console.error('Error in expenses summary:', err);
     res.status(500).json({ error: 'فشل جلب إحصائيات المصروفات' });
   }
@@ -111,6 +129,26 @@ router.get('/', async (req, res) => {
       pages: Math.ceil(total / limit)
     });
   } catch (err) {
+    if (isDbConnectionError(err)) {
+      console.warn('⚡ DB offline: Serving expenses list from local cache');
+      let expenses = localCache.expenses || [];
+      if (category && category !== 'all') {
+        expenses = expenses.filter(e => e.category === category);
+      }
+      if (q && q.trim()) {
+        const term = q.trim().toLowerCase();
+        expenses = expenses.filter(e => (e.title || '').toLowerCase().includes(term) || (e.notes || '').toLowerCase().includes(term));
+      }
+      const totalAmount = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+      return res.json({
+        expenses,
+        total: expenses.length,
+        filteredSum: totalAmount,
+        page: 1,
+        pages: 1,
+        isOfflineFallback: true
+      });
+    }
     console.error('Error fetching expenses:', err);
     res.status(500).json({ error: 'فشل تحميل قائمة المصروفات' });
   }
@@ -136,7 +174,7 @@ router.post('/', async (req, res) => {
       currentUser = await prisma.user.findUnique({
         where: { id: req.session.userId },
         select: { username: true }
-      });
+      }).catch(() => null);
     }
 
     const expense = await prisma.expense.create({
@@ -150,9 +188,30 @@ router.post('/', async (req, res) => {
       }
     });
 
-    await logAction(prisma, req, `إضافة مصروف: ${expense.title} بقيمة ${expense.amount}`, 'POST');
+    // Also update local cache
+    localCache.expenses = [expense, ...(localCache.expenses || [])];
+    persistCache();
+
+    await logAction(prisma, req, `إضافة مصروف: ${expense.title} بقيمة ${expense.amount}`, 'POST').catch(() => {});
     res.status(201).json(expense);
   } catch (err) {
+    if (isDbConnectionError(err)) {
+      console.warn('⚡ DB offline: Enqueueing expense creation in offline mutations');
+      const simulatedExpense = {
+        id: Date.now(),
+        title: title.trim(),
+        category: category || 'other',
+        amount: numAmount,
+        notes: notes ? notes.trim() : null,
+        date: date ? new Date(date) : new Date(),
+        paidBy: paidBy ? paidBy.trim() : 'المعلم',
+        createdAt: new Date()
+      };
+      localCache.expenses = [simulatedExpense, ...(localCache.expenses || [])];
+      persistCache();
+      enqueueOfflineMutation({ type: 'CREATE_EXPENSE', data: simulatedExpense });
+      return res.status(201).json({ ...simulatedExpense, isOfflineFallback: true });
+    }
     console.error('Error creating expense:', err);
     res.status(500).json({ error: 'فشل تسجيل المصروف' });
   }

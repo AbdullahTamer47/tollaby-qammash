@@ -3,6 +3,7 @@ const router = express.Router();
 const { requirePermission } = require('../middleware/auth');
 const { reconcileManyStudents } = require('../utils/wallet');
 const { logAction } = require('../utils/logAction');
+const { isDbConnectionError, cache: localCache } = require('../utils/localDBSnapshot');
 
 // GET /api/books
 router.get('/', requirePermission('books'), async (req, res) => {
@@ -35,6 +36,10 @@ router.get('/', requirePermission('books'), async (req, res) => {
 
     res.json(result);
   } catch (err) {
+    if (isDbConnectionError(err)) {
+      console.warn('⚡ DB offline: Serving books from local cache');
+      return res.json(localCache.books || []);
+    }
     res.status(500).json({ error: err.message });
   }
 });

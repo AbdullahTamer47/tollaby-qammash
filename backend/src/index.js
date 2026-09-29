@@ -258,12 +258,26 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'حدث خطأ داخلي في الخادم' });
 });
 
+// Local Offline Snapshot & Queue loop
+const { warmupCache, syncPendingMutations } = require('./utils/localDBSnapshot');
+
 // Start Server
 const PORT = process.env.ALWAYSDATA_HTTPD_PORT || process.env.PORT || 5000;
 const IP = process.env.ALWAYSDATA_HTTPD_IP || '0.0.0.0';
 if (!isVercel) {
   app.listen(PORT, IP, () => {
     console.log(`🚀 Tollaby backend running on http://${IP}:${PORT}`);
+    // Initial cache warmup & sync
+    setTimeout(() => {
+      warmupCache(prisma);
+      syncPendingMutations(prisma);
+    }, 2000);
+
+    // Periodic synchronization every 3 minutes
+    setInterval(() => {
+      warmupCache(prisma);
+      syncPendingMutations(prisma);
+    }, 3 * 60 * 1000);
   });
 }
 

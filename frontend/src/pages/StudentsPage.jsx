@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Html5QrcodeScanner } from 'html5-qrcode'
 import { QRCodeSVG } from 'qrcode.react'
-import { getStudents, deleteStudent, activateStudent, getGroups, getOffers, createStudent, updateStudent } from '../api'
+import { getStudents, deleteStudent, activateStudent, getGroups, getOffers, createStudent, updateStudent, importStudentsExcel } from '../api'
+import * as XLSX from 'xlsx'
 import { exportToCSV } from '../utils/csvExport'
 import Pagination from '../components/Pagination'
 import StudentReportModal from '../components/StudentReportModal'
@@ -32,13 +33,21 @@ export default function StudentsPage() {
 
   const [groups, setGroups] = useState([])
   const [offers, setOffers] = useState([])
-  const [modal, setModal] = useState(null) // null | 'add' | 'edit' | 'delete' | 'offer'
+  const [modal, setModal] = useState(null) // null | 'add' | 'edit' | 'delete' | 'offer' | 'import-excel'
   const [editingStudent, setEditingStudent] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [phoneErrors, setPhoneErrors] = useState({ phoneNumber: '', dadPhoneNumber: '' })
   const [offerForm, setOfferForm] = useState({ title: '', type: 'percentage', value: '' })
   const [msg, setMsg] = useState(null)
   const [qrModal, setQrModal] = useState(false)
+  
+  // Excel Import state
+  const [excelRows, setExcelRows] = useState([])
+  const [excelFileName, setExcelFileName] = useState('')
+  const [excelDefaultGroupId, setExcelDefaultGroupId] = useState('')
+  const [importingExcel, setImportingExcel] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  
   const navigate = useNavigate()
 
   const PER_PAGE = 10;
@@ -116,6 +125,82 @@ export default function StudentsPage() {
     }
   }
 
+  const openImportExcel = () => {
+    setExcelRows([])
+    setExcelFileName('')
+    setExcelDefaultGroupId(groups[0]?.id || '')
+    setImportResult(null)
+    setModal('import-excel')
+  }
+
+  const handleDownloadTemplate = () => {
+    const sampleData = [
+      {
+        'اسم الطالب': 'أحمد محمد علي',
+        'هاتف الطالب': '01012345678',
+        'هاتف ولي الأمر': '01212345678',
+        'النوع': 'ذكر',
+        'المجموعة': groups[0]?.name || 'مجموعة السبت 4 عصراً',
+        'الصف الدراسي': groups[0]?.grade || 'الصف الأول الثانوي'
+      },
+      {
+        'اسم الطالب': 'سارة إبراهيم محمود',
+        'هاتف الطالب': '01198765432',
+        'هاتف ولي الأمر': '01598765432',
+        'النوع': 'أنثي',
+        'المجموعة': groups[0]?.name || 'مجموعة السبت 4 عصراً',
+        'الصف الدراسي': groups[0]?.grade || 'الصف الأول الثانوي'
+      }
+    ]
+    const ws = XLSX.utils.json_to_sheet(sampleData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'الطلاب')
+    XLSX.writeFile(wb, 'نموذج_استيراد_الطلاب.xlsx')
+  }
+
+  const handleExcelFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setExcelFileName(file.name)
+    setImportResult(null)
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const firstSheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[firstSheetName]
+        const rows = XLSX.utils.sheet_to_json(worksheet)
+        setExcelRows(rows)
+      } catch (err) {
+        alert('حدث خطأ في قراءة ملف الإكسيل: ' + err.message)
+      }
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  const handleStartImport = async () => {
+    if (excelRows.length === 0) {
+      alert('يرجى اختيار ملف يحتوي على بيانات أولاً')
+      return
+    }
+    setImportingExcel(true)
+    setImportResult(null)
+    try {
+      const res = await importStudentsExcel({
+        students: excelRows,
+        defaultGroupId: excelDefaultGroupId || undefined
+      })
+      setImportResult(res.data)
+      setMsg({ type: 'success', text: `تم استيراد ${res.data.importedCount} طالب بنجاح!` })
+      load(1)
+    } catch (err) {
+      alert(err.response?.data?.error || 'فشل استيراد الطلاب')
+    } finally {
+      setImportingExcel(false)
+    }
+  }
+
   const openAdd = () => {
     setForm({ ...EMPTY_FORM, groupId: groups[0]?.id || '', offerId: offers[0]?.id || '' })
     setEditingStudent(null)
@@ -179,6 +264,9 @@ export default function StudentsPage() {
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button className="btn btn-secondary" onClick={handleExportCSV}>
             <i className="pi pi-download" /> تصدير CSV
+          </button>
+          <button className="btn btn-secondary" style={{ background: '#059669', borderColor: '#059669', color: '#fff' }} onClick={openImportExcel}>
+            <i className="pi pi-file-excel" /> استيراد إكسيل
           </button>
           <button className="btn btn-secondary" onClick={() => setModal('offer')}>
             <i className="pi pi-tag" /> إضافة خصم
@@ -476,6 +564,166 @@ export default function StudentsPage() {
                 <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>إلغاء</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Excel Modal */}
+      {modal === 'import-excel' && (
+        <div className="modal-overlay" onClick={() => setModal(null)}>
+          <div className="modal" style={{ maxWidth: '650px', width: '95%' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#059669' }}>
+                <i className="pi pi-file-excel" style={{ fontSize: '1.4rem' }} /> استيراد بيانات الطلاب من ملف Excel / CSV
+              </h3>
+              <button className="modal-close" onClick={() => setModal(null)}><i className="pi pi-times" /></button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', margin: '1rem 0' }}>
+              {/* Step 1: Template download banner */}
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '1px dashed #10b981',
+                padding: '1rem',
+                borderRadius: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '0.5rem'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: 'var(--text-color)', marginBottom: '0.2rem' }}>
+                    💡 ليس لديك ملف جاهز؟
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-color-secondary)' }}>
+                    حمّل النموذج الجاهز واملأ أسماء وأرقام الطلاب ثم أعد رفعه هنا
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-success"
+                  onClick={handleDownloadTemplate}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}
+                >
+                  <i className="pi pi-download" /> تحميل نموذج Excel فارغ (.xlsx)
+                </button>
+              </div>
+
+              {/* Step 2: Choose File */}
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 700 }}>
+                  اختر ملف Excel (.xlsx, .xls, .csv):
+                </label>
+                <input
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  className="form-control"
+                  onChange={handleExcelFileChange}
+                />
+                {excelFileName && (
+                  <div style={{ fontSize: '0.85rem', color: '#059669', marginTop: '0.3rem', fontWeight: 600 }}>
+                    📄 الملف المحدد: {excelFileName} (تم العثور على {excelRows.length} سجل)
+                  </div>
+                )}
+              </div>
+
+              {/* Step 3: Default Group override */}
+              <div className="form-group">
+                <label className="form-label">
+                  المجموعة الافتراضية للطلاب (اختياري، في حال لم يُحدد عمود المجموعة في الملف):
+                </label>
+                <select
+                  className="form-control"
+                  value={excelDefaultGroupId}
+                  onChange={e => setExcelDefaultGroupId(e.target.value)}
+                >
+                  <option value="">-- تلقائي (أول مجموعة أو إنشاء المجموعة المذكورة في الملف) --</option>
+                  {groups.map(g => (
+                    <option key={g.id} value={g.id}>{g.name} ({g.grade})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Step 4: Preview if rows loaded */}
+              {excelRows.length > 0 && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>معاينة البيانات المستخرجة:</span>
+                    <span className="badge badge-info">{excelRows.length} طالب</span>
+                  </div>
+                  <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--surface-border)', borderRadius: '6px' }}>
+                    <table className="table" style={{ fontSize: '0.82rem', marginBottom: 0 }}>
+                      <thead>
+                        <tr>
+                          <th>الاسم</th>
+                          <th>هاتف الطالب</th>
+                          <th>هاتف ولي الأمر</th>
+                          <th>المجموعة</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {excelRows.slice(0, 5).map((row, idx) => (
+                          <tr key={idx}>
+                            <td>{row.name || row['اسم الطالب'] || row['الاسم'] || '—'}</td>
+                            <td>{row.phoneNumber || row.phone || row['رقم الهاتف'] || row['هاتف الطالب'] || '—'}</td>
+                            <td>{row.dadPhoneNumber || row.parentPhone || row['رقم ولي الأمر'] || row['هاتف ولي الأمر'] || '—'}</td>
+                            <td>{row.groupName || row.group || row['المجموعة'] || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {excelRows.length > 5 && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-color-secondary)', marginTop: '0.3rem', textAlign: 'center' }}>
+                      (عرض أول 5 صفوف من إجمالي {excelRows.length} صف)
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Result display */}
+              {importResult && (
+                <div className="alert alert-success" style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  <div style={{ fontWeight: 700 }}>
+                    🎉 تم استيراد {importResult.importedCount} طالب بنجاح!
+                  </div>
+                  {importResult.skippedCount > 0 && (
+                    <div style={{ fontSize: '0.85rem', color: '#92400e' }}>
+                      ⚠️ تم تخطي {importResult.skippedCount} صف لعدم اكتمال بيانات الاسم.
+                    </div>
+                  )}
+                  {importResult.errorsCount > 0 && (
+                    <div style={{ fontSize: '0.85rem', color: '#b91c1c' }}>
+                      ❌ حدث خطأ في إضافة {importResult.errorsCount} طالب.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+              <button
+                type="button"
+                className="btn btn-success"
+                disabled={excelRows.length === 0 || importingExcel}
+                onClick={handleStartImport}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+              >
+                {importingExcel ? (
+                  <>
+                    <i className="pi pi-spin pi-spinner" /> جاري الاستيراد...
+                  </>
+                ) : (
+                  <>
+                    <i className="pi pi-check-circle" /> بدء استيراد ({excelRows.length}) طالب
+                  </>
+                )}
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>
+                {importResult ? 'إغلاق' : 'إلغاء'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -17,3 +17,6 @@ frontend/android/.gradle
 frontend/android/build
 frontend/android/app/build
 .vercel
+frontend/dev-dist
+backend/data/*.json
+

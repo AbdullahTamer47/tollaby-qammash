@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logAction } = require('../utils/logAction');
+const { isDbConnectionError, cache: localCache } = require('../utils/localDBSnapshot');
 
 // GET /api/groups
 router.get('/', requireAuth, async (req, res) => {
@@ -13,6 +14,10 @@ router.get('/', requireAuth, async (req, res) => {
     });
     res.json(groups);
   } catch (err) {
+    if (isDbConnectionError(err)) {
+      console.warn('⚡ DB offline: Serving groups from local cache');
+      return res.json(localCache.groups || []);
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -170,6 +175,20 @@ router.get('/:id/students', requirePermission('groups'), async (req, res) => {
       }
     });
   } catch (err) {
+    if (isDbConnectionError(err)) {
+      console.warn('⚡ DB offline: Serving group students from local cache');
+      const gStudents = (localCache.students || []).filter(s => s.groupId === groupId);
+      return res.json({
+        students: gStudents.map(s => ({
+          ...s,
+          attendanceStats: { totalSessions: 0, attendedCount: 0, absentCount: 0, attendanceRate: 100, lastStatus: 'none' },
+          attendanceHistory: []
+        })),
+        groupSessions: [],
+        stats: { totalStudents: gStudents.length, totalSessions: 0, overallAttendanceRate: 100 },
+        isOfflineFallback: true
+      });
+    }
     console.error('Error fetching group students:', err);
     res.status(500).json({ error: err.message });
   }

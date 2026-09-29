@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { getGroups, getStudents, getStudent } from '../api'
+import { getGroups, getStudents, getStudent, bulkCardPrinted, toggleStudentCardPrinted } from '../api'
 import { QRCodeSVG } from 'qrcode.react'
 
 export default function QRCodesPage() {
@@ -90,8 +90,10 @@ export default function QRCodesPage() {
     setSelectedIds(new Set())
   }
 
+  const isStudentPrinted = (s) => Boolean(s.cardPrinted || printedMap[s.id])
+
   const selectUnprintedOnly = () => {
-    const unprinted = students.filter(s => !printedMap[s.id]).map(s => s.id)
+    const unprinted = students.filter(s => !isStudentPrinted(s)).map(s => s.id)
     setSelectedIds(new Set(unprinted))
   }
 
@@ -101,7 +103,13 @@ export default function QRCodesPage() {
       return
     }
 
-    // Record printing status for selected students
+    const idsArray = Array.from(selectedIds)
+    // 1. Persist to server database!
+    bulkCardPrinted(idsArray, true).catch(() => {})
+
+    // 2. Update local state & memory
+    setStudents(prev => prev.map(s => selectedIds.has(s.id) ? { ...s, cardPrinted: true } : s))
+
     const updated = { ...printedMap }
     const nowStr = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     selectedIds.forEach(id => {
@@ -116,19 +124,53 @@ export default function QRCodesPage() {
     window.print()
   }
 
-  const markSelectedAsPrinted = () => {
-    const updated = { ...printedMap }
-    const nowStr = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric', year: 'numeric' })
-    selectedIds.forEach(id => {
-      const prev = updated[id] || { count: 0 }
-      updated[id] = { count: prev.count + 1, printedAt: nowStr }
-    })
-    setPrintedMap(updated)
-    localStorage.setItem('tollaby_printed_cards', JSON.stringify(updated))
+  const markSelectedAsPrinted = async (printed = true) => {
+    const idsArray = Array.from(selectedIds)
+    if (idsArray.length === 0) return
+    try {
+      await bulkCardPrinted(idsArray, printed)
+      setStudents(prev => prev.map(s => selectedIds.has(s.id) ? { ...s, cardPrinted: printed } : s))
+      const updated = { ...printedMap }
+      const nowStr = new Date().toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric', year: 'numeric' })
+      selectedIds.forEach(id => {
+        if (printed) {
+          const prev = updated[id] || { count: 0 }
+          updated[id] = { count: prev.count + 1, printedAt: nowStr }
+        } else {
+          delete updated[id]
+        }
+      })
+      setPrintedMap(updated)
+      localStorage.setItem('tollaby_printed_cards', JSON.stringify(updated))
+    } catch {
+      alert('فشل تحديث حالة الطباعة على السيرفر')
+    }
   }
 
-  const resetPrintingStatus = () => {
+  const handleToggleSingleCard = async (studentId, currentPrinted) => {
+    try {
+      const next = !currentPrinted
+      await toggleStudentCardPrinted(studentId, next)
+      setStudents(prev => prev.map(s => s.id === studentId ? { ...s, cardPrinted: next } : s))
+      setPrintedMap(prev => {
+        const copy = { ...prev }
+        if (next) copy[studentId] = { count: 1, printedAt: new Date().toLocaleDateString('ar-EG') }
+        else delete copy[studentId]
+        localStorage.setItem('tollaby_printed_cards', JSON.stringify(copy))
+        return copy
+      })
+    } catch {
+      alert('فشل تحديث حالة الكارت')
+    }
+  }
+
+  const resetPrintingStatus = async () => {
     if (window.confirm('هل أنت متأكد من تصفير سجل طباعة الكروت؟')) {
+      const allIds = students.map(s => s.id)
+      if (allIds.length > 0) {
+        bulkCardPrinted(allIds, false).catch(() => {})
+      }
+      setStudents(prev => prev.map(s => ({ ...s, cardPrinted: false })))
       setPrintedMap({})
       localStorage.removeItem('tollaby_printed_cards')
     }
@@ -136,14 +178,14 @@ export default function QRCodesPage() {
 
   // Filter students by print filter tab
   const displayedStudents = students.filter(s => {
-    const isPrinted = Boolean(printedMap[s.id])
+    const isPrinted = isStudentPrinted(s)
     if (printFilter === 'unprinted') return !isPrinted
     if (printFilter === 'printed') return isPrinted
     return true
   })
 
-  const unprintedCount = students.filter(s => !printedMap[s.id]).length
-  const printedCount = students.filter(s => Boolean(printedMap[s.id])).length
+  const unprintedCount = students.filter(s => !isStudentPrinted(s)).length
+  const printedCount = students.filter(s => isStudentPrinted(s)).length
   const selectedCount = students.filter(s => selectedIds.has(s.id)).length
 
   // Unique grades from groups
@@ -487,8 +529,8 @@ export default function QRCodesPage() {
           <div className="id-cards-grid">
             {displayedStudents.map(s => {
               const isSelected = selectedIds.has(s.id)
+              const isPrinted = isStudentPrinted(s)
               const printRecord = printedMap[s.id]
-              const isPrinted = Boolean(printRecord)
 
               return (
                 <div
@@ -497,10 +539,18 @@ export default function QRCodesPage() {
                   onClick={() => toggleSelectStudent(s.id)}
                 >
                   {/* Status Indicator (No-Print) */}
-                  <div className="print-status-tag no-print">
+                  <div
+                    className="print-status-tag no-print"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleToggleSingleCard(s.id, isPrinted)
+                    }}
+                    title="انقر هنا لتغيير حالة الطباعة (مطبوع / غير مطبوع)"
+                    style={{ cursor: 'pointer' }}
+                  >
                     {isPrinted ? (
                       <span className="badge badge-success" style={{ fontSize: '0.72rem' }}>
-                        ✅ تم طباعته ({printRecord.count}x)
+                        ✅ تم طباعته {printRecord?.count ? `(${printRecord.count}x)` : ''}
                       </span>
                     ) : (
                       <span className="badge badge-warning" style={{ fontSize: '0.72rem' }}>

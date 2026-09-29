@@ -271,4 +271,9 @@ export const sendAttendanceNotification = (sessionId, data) => api.post(`/notifi
 export const sendExamNotification = (examId, data) => api.post(`/notifications/exam/${examId}`, data)
 export const sendSessionNotification = (sessionId, action, data) => api.post(`/notifications/session/${sessionId}/${action}`, data)
 
+// Student Cards & Excel Import
+export const bulkCardPrinted = (studentIds, printed = true) => api.post('/students/bulk-card-printed', { studentIds, printed })
+export const toggleStudentCardPrinted = (studentId, printed) => api.post(`/students/${studentId}/card-printed`, { printed })
+export const importStudentsExcel = (data) => api.post('/students/import-excel', data)
+
 export default api
