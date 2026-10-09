@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { requireTeacher } = require('../middleware/auth');
 const { summarizeStudentPayments } = require('../utils/payments');
+const { withDbTimeout, cache: localCache } = require('../utils/localDBSnapshot');
 
 // GET /api/admin/stats
 router.get('/stats', requireTeacher, async (req, res) => {
@@ -90,7 +91,25 @@ router.get('/stats', requireTeacher, async (req, res) => {
       revenueChart
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.warn('⚡ DB offline/timeout: Serving admin stats from local cache');
+    const students = localCache.students || [];
+    const groups = localCache.groups || [];
+    const sessions = localCache.sessions || [];
+    const users = localCache.users || [];
+    const assistants = users.filter(u => u.role === 'assistant');
+    const teachers = users.filter(u => u.role === 'teacher');
+    res.json({
+      studentsCount: students.length,
+      activeStudentsCount: students.filter(s => s.active !== false).length,
+      groupsCount: groups.length,
+      sessionsCount: sessions.length,
+      totalRevenue: 0,
+      totalDebt: 0,
+      usersCount: users.length,
+      assistantsCount: assistants.length,
+      revenueChart: [],
+      isOfflineFallback: true
+    });
   }
 });
 

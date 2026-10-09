@@ -39,28 +39,33 @@ if %errorlevel% neq 0 (
 ping 127.0.0.1 -n 2 >nul
 
 set APP_URL=https://localhost:5173
+set BROWSER_FLAGS=--user-data-dir="%LOCALAPPDATA%\Tollaby\app_profile" --ignore-certificate-errors --allow-insecure-localhost
 
 REM Try Google Chrome in App Mode
 if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" (
-    start "" "%ProgramFiles%\Google\Chrome\Application\chrome.exe" --ignore-certificate-errors --app=%APP_URL%
+    start "" "%ProgramFiles%\Google\Chrome\Application\chrome.exe" %BROWSER_FLAGS% --app=%APP_URL%
     exit
 )
 if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" (
-    start "" "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" --ignore-certificate-errors --app=%APP_URL%
+    start "" "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" %BROWSER_FLAGS% --app=%APP_URL%
     exit
 )
 if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" (
-    start "" "%LocalAppData%\Google\Chrome\Application\chrome.exe" --ignore-certificate-errors --app=%APP_URL%
+    start "" "%LocalAppData%\Google\Chrome\Application\chrome.exe" %BROWSER_FLAGS% --app=%APP_URL%
     exit
 )
 
 REM Try Microsoft Edge in App Mode
 if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" (
-    start "" "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" --ignore-certificate-errors --app=%APP_URL%
+    start "" "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" %BROWSER_FLAGS% --app=%APP_URL%
     exit
 )
 if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" (
-    start "" "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" --ignore-certificate-errors --app=%APP_URL%
+    start "" "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" %BROWSER_FLAGS% --app=%APP_URL%
+    exit
+)
+if exist "%LocalAppData%\Microsoft\Edge\Application\msedge.exe" (
+    start "" "%LocalAppData%\Microsoft\Edge\Application\msedge.exe" %BROWSER_FLAGS% --app=%APP_URL%
     exit
 )
 

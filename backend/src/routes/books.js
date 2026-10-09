@@ -3,21 +3,24 @@ const router = express.Router();
 const { requirePermission } = require('../middleware/auth');
 const { reconcileManyStudents } = require('../utils/wallet');
 const { logAction } = require('../utils/logAction');
-const { isDbConnectionError, cache: localCache } = require('../utils/localDBSnapshot');
+const { isDbConnectionError, withDbTimeout, cache: localCache } = require('../utils/localDBSnapshot');
 
 // GET /api/books
 router.get('/', requirePermission('books'), async (req, res) => {
   const prisma = req.app.locals.prisma;
   try {
-    const [books, bookingStats] = await Promise.all([
-      prisma.book.findMany({
-        orderBy: [{ grade: 'asc' }, { title: 'asc' }]
-      }),
-      prisma.bookBooking.groupBy({
-        by: ['bookId', 'delivered'],
-        _count: { _all: true }
-      })
-    ]);
+    const [books, bookingStats] = await withDbTimeout(
+      Promise.all([
+        prisma.book.findMany({
+          orderBy: [{ grade: 'asc' }, { title: 'asc' }]
+        }),
+        prisma.bookBooking.groupBy({
+          by: ['bookId', 'delivered'],
+          _count: { _all: true }
+        })
+      ]),
+      2000
+    );
 
     const statsMap = {};
     for (const row of bookingStats) {
@@ -36,11 +39,8 @@ router.get('/', requirePermission('books'), async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    if (isDbConnectionError(err)) {
-      console.warn('⚡ DB offline: Serving books from local cache');
-      return res.json(localCache.books || []);
-    }
-    res.status(500).json({ error: err.message });
+    console.warn('⚡ DB offline/timeout: Serving books from local cache');
+    return res.json(localCache.books || []);
   }
 });
 

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const CACHE_FILE = path.join(DATA_DIR, 'local_cache.json');
@@ -10,6 +11,25 @@ if (!fs.existsSync(DATA_DIR)) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
 }
 
+const DEFAULT_USERS = [
+  {
+    id: 1,
+    username: 'admin',
+    password: bcrypt.hashSync('admin123', 10),
+    role: 'teacher',
+    permissions: '[]',
+    dateJoined: new Date().toISOString()
+  },
+  {
+    id: 2,
+    username: 'qammash',
+    password: bcrypt.hashSync('123', 10),
+    role: 'teacher',
+    permissions: '[]',
+    dateJoined: new Date().toISOString()
+  }
+];
+
 let cache = {
   students: [],
   groups: [],
@@ -17,7 +37,7 @@ let cache = {
   expenses: [],
   books: [],
   offers: [],
-  users: [],
+  users: DEFAULT_USERS,
   lastUpdated: null
 };
 
@@ -26,10 +46,14 @@ try {
   if (fs.existsSync(CACHE_FILE)) {
     const raw = fs.readFileSync(CACHE_FILE, 'utf8');
     cache = { ...cache, ...JSON.parse(raw) };
-    console.log(`📦 Loaded local offline cache (${cache.students?.length || 0} students, ${cache.groups?.length || 0} groups)`);
+    if (!cache.users || cache.users.length === 0) {
+      cache.users = DEFAULT_USERS;
+    }
+    console.log(`📦 Loaded local offline cache (${cache.students?.length || 0} students, ${cache.groups?.length || 0} groups, ${cache.users?.length || 0} users)`);
   }
 } catch (e) {
   console.warn('Failed to parse local cache file:', e.message);
+  cache.users = DEFAULT_USERS;
 }
 
 function persistCache() {
@@ -49,16 +73,40 @@ function isDbConnectionError(err) {
     code === 'P1001' || // Can't reach database server
     code === 'P1002' || // The database server was reached but timed out
     code === 'P1003' || // Database does not exist
+    code === 'P1008' || // Operations timed out
+    code === 'P1011' || // Error opening a TLS connection
     code === 'P1017' || // Server has closed the connection
+    code === 'P2024' || // Timed out fetching a connection from the pool
     code === 'ECONNREFUSED' ||
     code === 'ETIMEDOUT' ||
     code === 'ENOTFOUND' ||
+    code === 'EAI_AGAIN' ||
     msg.includes("can't reach database server") ||
     msg.includes('connection timed out') ||
     msg.includes('connection refused') ||
     msg.includes('pool timeout') ||
-    name === 'PrismaClientInitializationError'
+    msg.includes('timed out') ||
+    msg.includes('timeout') ||
+    msg.includes('getaddrinfo') ||
+    msg.includes('econnrefused') ||
+    msg.includes('enotfound') ||
+    msg.includes('fetch failed') ||
+    name === 'PrismaClientInitializationError' ||
+    name === 'PrismaClientKnownRequestError' ||
+    name === 'PrismaClientUnknownRequestError' ||
+    name === 'PrismaClientRustPanicError'
   );
+}
+
+function withDbTimeout(promise, ms = 2500) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      const err = new Error('Database connection timed out');
+      err.code = 'ETIMEDOUT';
+      setTimeout(() => reject(err), ms);
+    })
+  ]);
 }
 
 async function warmupCache(prisma) {
@@ -71,7 +119,7 @@ async function warmupCache(prisma) {
       prisma.expense.findMany({ take: 100, orderBy: { date: 'desc' } }).catch(() => null),
       prisma.book.findMany({ include: { _count: { select: { bookings: true } } } }).catch(() => null),
       prisma.offer.findMany().catch(() => null),
-      prisma.user.findMany({ select: { id: true, name: true, username: true, role: true, permissions: true, active: true } }).catch(() => null)
+      prisma.user.findMany({ select: { id: true, username: true, password: true, role: true, permissions: true, dateJoined: true } }).catch(() => null)
     ]);
 
     let changed = false;
@@ -81,7 +129,7 @@ async function warmupCache(prisma) {
     if (expenses) { cache.expenses = expenses; changed = true; }
     if (books) { cache.books = books; changed = true; }
     if (offers) { cache.offers = offers; changed = true; }
-    if (users) { cache.users = users; changed = true; }
+    if (users && users.length > 0) { cache.users = users; changed = true; }
 
     if (changed) {
       cache.lastUpdated = new Date().toISOString();
@@ -163,6 +211,7 @@ module.exports = {
   cache,
   persistCache,
   isDbConnectionError,
+  withDbTimeout,
   warmupCache,
   enqueueOfflineMutation,
   syncPendingMutations

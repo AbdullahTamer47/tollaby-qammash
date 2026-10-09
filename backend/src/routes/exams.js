@@ -3,6 +3,7 @@ const router = express.Router();
 const { requirePermission } = require('../middleware/auth');
 const { logAction } = require('../utils/logAction');
 const { autoNotifyExamGrades } = require('../utils/autoNotify');
+const { withDbTimeout, cache: localCache } = require('../utils/localDBSnapshot');
 
 // GET /api/exams
 router.get('/', requirePermission('exams'), async (req, res) => {
@@ -14,18 +15,22 @@ router.get('/', requirePermission('exams'), async (req, res) => {
       ...(groupId && { groupId: parseInt(groupId) }),
       ...(grade && { grade })
     };
-    const [exams, total] = await Promise.all([
-      prisma.exam.findMany({
-        where,
-        skip, take: parseInt(per_page),
-        include: { group: true },
-        orderBy: { id: 'desc' }
-      }),
-      prisma.exam.count({ where })
-    ]);
+    const [exams, total] = await withDbTimeout(
+      Promise.all([
+        prisma.exam.findMany({
+          where,
+          skip, take: parseInt(per_page),
+          include: { group: true },
+          orderBy: { id: 'desc' }
+        }),
+        prisma.exam.count({ where })
+      ]),
+      2000
+    );
     res.json({ exams, total, page: parseInt(page), per_page: parseInt(per_page) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.warn('⚡ DB offline/timeout: Serving exams fallback');
+    res.json({ exams: localCache.exams || [], total: (localCache.exams || []).length, page: parseInt(page) || 1, per_page: parseInt(per_page) || 15, isOfflineFallback: true });
   }
 });
 

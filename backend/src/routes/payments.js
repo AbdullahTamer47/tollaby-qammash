@@ -6,6 +6,7 @@ const { getStudentPaymentSnapshot, summarizeStudentPayments } = require('../util
 const { logAction } = require('../utils/logAction');
 const { autoNotifyPaymentAdded } = require('../utils/autoNotify');
 const { runBackgroundTask } = require('../utils/backgroundTask');
+const { withDbTimeout, cache: localCache } = require('../utils/localDBSnapshot');
 
 function csvEscape(value) {
   const str = value === null || value === undefined ? '' : String(value);
@@ -22,19 +23,22 @@ router.get('/', requirePermission('payments'), async (req, res) => {
       ...(groupId && { groupId: parseInt(groupId) })
     };
     const skip = (parseInt(page) - 1) * parseInt(per_page);
-    const [students, total] = await Promise.all([
-      prisma.student.findMany({
-        where, skip, take: parseInt(per_page),
-        include: { 
-          group: true, offer: true,
-          attendance: { include: { session: true } },
-          bookBookings: { include: { book: true } },
-          eachPayments: { orderBy: { lastPaymentDate: 'desc' } }
-        },
-        orderBy: { id: 'asc' }
-      }),
-      prisma.student.count({ where })
-    ]);
+    const [students, total] = await withDbTimeout(
+      Promise.all([
+        prisma.student.findMany({
+          where, skip, take: parseInt(per_page),
+          include: { 
+            group: true, offer: true,
+            attendance: { include: { session: true } },
+            bookBookings: { include: { book: true } },
+            eachPayments: { orderBy: { lastPaymentDate: 'desc' } }
+          },
+          orderBy: { id: 'asc' }
+        }),
+        prisma.student.count({ where })
+      ]),
+      2000
+    );
 
     const payments = students.map(student => {
       const summary = summarizeStudentPayments(student);
@@ -60,7 +64,32 @@ router.get('/', requirePermission('payments'), async (req, res) => {
 
     res.json({ payments, total, page: parseInt(page), per_page: parseInt(per_page) });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.warn('⚡ DB offline/timeout: Serving payments from local cache');
+    let list = localCache.students || [];
+    if (groupId) list = list.filter(s => s.groupId === parseInt(groupId));
+    if (q && q.trim()) {
+      const query = q.trim().toLowerCase();
+      list = list.filter(s => (s.name || '').toLowerCase().includes(query) || String(s.id) === query);
+    }
+    const pageNum = parseInt(page) || 1;
+    const perPageNum = parseInt(per_page) || 15;
+    const paged = list.slice((pageNum - 1) * perPageNum, pageNum * perPageNum);
+    const payments = paged.map(student => ({
+      id: student.id,
+      studentId: student.id,
+      student,
+      sessionsDue: 0,
+      sessionsPaid: 0,
+      bookingsDue: 0,
+      bookingsPaid: 0,
+      amountDue: 0,
+      amountPaid: 0,
+      sessionsBalance: 0,
+      bookingsBalance: 0,
+      lastPayment: 0,
+      lastPaymentDate: new Date(0)
+    }));
+    res.json({ payments, total: list.length, page: pageNum, per_page: perPageNum, isOfflineFallback: true });
   }
 });
 

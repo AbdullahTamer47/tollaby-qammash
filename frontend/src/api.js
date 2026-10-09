@@ -125,7 +125,7 @@ export const syncOfflineNow = () => syncOfflineQueue(api);
 
 // Auth
 export const login = async (data) => {
-  const res = await api.post('/auth/login', data);
+  const res = await api.post('/auth/login', data, { skipGlobalError: true });
   if (res.data?.token && typeof window !== 'undefined') {
     localStorage.setItem('qammash_token', res.data.token);
   }
@@ -147,7 +147,7 @@ export const createAssistant = (data) => api.post('/auth/assistants', data)
 export const getAssistants = () => api.get('/auth/assistants')
 export const updateAssistant = (id, data) => api.put(`/auth/assistants/${id}`, data)
 export const deleteAssistant = (id) => api.delete(`/auth/assistants/${id}`)
-export const getQuickUsers = () => api.get('/auth/quick-users')
+export const getQuickUsers = () => api.get('/auth/quick-users', { skipGlobalError: true })
 
 
 // Students

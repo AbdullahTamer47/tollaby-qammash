@@ -98,32 +98,39 @@ const origDestroy = prismaSessionStore.destroy.bind(prismaSessionStore);
 
 prismaSessionStore.get = function(sid, callback) {
   const mem = memorySessionMap.get(sid);
+  if (mem) {
+    return callback(null, mem);
+  }
   origGet(sid, (err, sess) => {
     if (err) {
-      // In offline mode or DB error, suppress error so express-session does not crash with 500
-      return callback(null, mem || null);
+      return callback(null, null);
     }
     if (sess) {
       memorySessionMap.set(sid, sess);
       return callback(null, sess);
     }
-    callback(null, mem || null);
+    callback(null, null);
   });
 };
 
 prismaSessionStore.set = function(sid, sess, callback) {
   memorySessionMap.set(sid, sess);
-  origSet(sid, sess, (err) => {
-    if (err) console.warn('Offline session saved to local memory cache');
-    callback && callback(null);
-  });
+  try {
+    origSet(sid, sess, () => {});
+  } catch (e) {}
+  if (callback) {
+    callback(null);
+  }
 };
 
 prismaSessionStore.destroy = function(sid, callback) {
   memorySessionMap.delete(sid);
-  origDestroy(sid, (err) => {
-    callback && callback(null);
-  });
+  try {
+    origDestroy(sid, () => {});
+  } catch (e) {}
+  if (callback) {
+    callback(null);
+  }
 };
 
 // Session: only use secure cookies when running on Vercel HTTPS; local development / LAN works seamlessly on HTTP

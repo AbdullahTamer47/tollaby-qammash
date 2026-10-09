@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { requireTeacher } = require('../middleware/auth');
+const { isDbConnectionError, cache: localCache } = require('../utils/localDBSnapshot');
 
 // GET /api/teacher/dashboard
 router.get('/dashboard', requireTeacher, async (req, res) => {
@@ -67,7 +68,28 @@ router.get('/dashboard', requireTeacher, async (req, res) => {
       }))
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.warn('⚡ DB offline/timeout: Serving teacher dashboard from local cache:', err.message);
+    const students = localCache.students || [];
+    const groups = localCache.groups || [];
+    const sessions = localCache.sessions || [];
+    const expenses = localCache.expenses || [];
+    const users = localCache.users || [];
+    const assistants = users.filter(u => u.role === 'assistant');
+    return res.json({
+      stats: {
+        totalStudents: students.length,
+        totalGroups: groups.length,
+        assistantsCount: assistants.length,
+        sessionsToday: 0,
+        paymentsTodayCount: 0,
+        paymentsTodaySum: 0,
+        expensesTodaySum: expenses.reduce((s, e) => s + (e.amount || 0), 0),
+        netToday: 0
+      },
+      assistants,
+      logs: [],
+      isOfflineFallback: true
+    });
   }
 });
 

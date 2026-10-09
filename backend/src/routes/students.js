@@ -4,7 +4,7 @@ const { requirePermission } = require('../middleware/auth');
 const { summarizeStudentPayments } = require('../utils/payments');
 const { reconcileStudentPayments } = require('../utils/wallet');
 const { logAction } = require('../utils/logAction');
-const { isDbConnectionError, cache: localCache, enqueueOfflineMutation, persistCache } = require('../utils/localDBSnapshot');
+const { isDbConnectionError, withDbTimeout, cache: localCache, enqueueOfflineMutation, persistCache } = require('../utils/localDBSnapshot');
 
 // GET /api/students
 router.get('/', requirePermission('students'), async (req, res) => {
@@ -27,48 +27,48 @@ router.get('/', requirePermission('students'), async (req, res) => {
       ...(grade && { group: { grade } })
     };
     const skip = (parseInt(page) - 1) * parseInt(per_page);
-    const [students, total] = await Promise.all([
-      prisma.student.findMany({
-        where, skip, take: parseInt(per_page),
-        orderBy: { id: 'asc' },
-        include: { group: true, offer: true }
-      }),
-      prisma.student.count({ where })
-    ]);
+    const [students, total] = await withDbTimeout(
+      Promise.all([
+        prisma.student.findMany({
+          where, skip, take: parseInt(per_page),
+          orderBy: { id: 'asc' },
+          include: { group: true, offer: true }
+        }),
+        prisma.student.count({ where })
+      ]),
+      2000
+    );
     res.json({ students, total, page: parseInt(page), per_page: parseInt(per_page) });
   } catch (err) {
-    if (isDbConnectionError(err)) {
-      console.warn('⚡ DB offline: Serving students from local cache');
-      let list = localCache.students || [];
-      if (groupId) list = list.filter(s => s.groupId === parseInt(groupId));
-      if (active !== undefined && active !== '') {
-        list = list.filter(s => Boolean(s.active) === (active === 'true'));
-      }
-      if (cardPrinted !== undefined && cardPrinted !== '') {
-        list = list.filter(s => Boolean(s.cardPrinted) === (cardPrinted === 'true'));
-      }
-      if (q && q.trim()) {
-        const query = q.trim().toLowerCase();
-        list = list.filter(s =>
-          (s.name || '').toLowerCase().includes(query) ||
-          String(s.id) === query ||
-          (s.phoneNumber || '').includes(query) ||
-          (s.dadPhoneNumber || '').includes(query)
-        );
-      }
-      const pageNum = parseInt(page) || 1;
-      const perPageNum = parseInt(per_page) || 15;
-      const skip = (pageNum - 1) * perPageNum;
-      const paginated = list.slice(skip, skip + perPageNum);
-      return res.json({
-        students: paginated,
-        total: list.length,
-        page: pageNum,
-        per_page: perPageNum,
-        isOfflineFallback: true
-      });
+    console.warn('⚡ DB offline/timeout: Serving students from local cache');
+    let list = localCache.students || [];
+    if (groupId) list = list.filter(s => s.groupId === parseInt(groupId));
+    if (active !== undefined && active !== '') {
+      list = list.filter(s => Boolean(s.active) === (active === 'true'));
     }
-    res.status(500).json({ error: err.message });
+    if (cardPrinted !== undefined && cardPrinted !== '') {
+      list = list.filter(s => Boolean(s.cardPrinted) === (cardPrinted === 'true'));
+    }
+    if (q && q.trim()) {
+      const query = q.trim().toLowerCase();
+      list = list.filter(s =>
+        (s.name || '').toLowerCase().includes(query) ||
+        String(s.id) === query ||
+        (s.phoneNumber || '').includes(query) ||
+        (s.dadPhoneNumber || '').includes(query)
+      );
+    }
+    const pageNum = parseInt(page) || 1;
+    const perPageNum = parseInt(per_page) || 15;
+    const skip = (pageNum - 1) * perPageNum;
+    const paginated = list.slice(skip, skip + perPageNum);
+    return res.json({
+      students: paginated,
+      total: list.length,
+      page: pageNum,
+      per_page: perPageNum,
+      isOfflineFallback: true
+    });
   }
 });
 

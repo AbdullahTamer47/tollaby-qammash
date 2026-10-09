@@ -2,23 +2,23 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth, requirePermission } = require('../middleware/auth');
 const { logAction } = require('../utils/logAction');
-const { isDbConnectionError, cache: localCache } = require('../utils/localDBSnapshot');
+const { isDbConnectionError, withDbTimeout, cache: localCache } = require('../utils/localDBSnapshot');
 
 // GET /api/groups
 router.get('/', requireAuth, async (req, res) => {
   const prisma = req.app.locals.prisma;
   try {
-    const groups = await prisma.group.findMany({
-      include: { _count: { select: { students: true } } },
-      orderBy: { name: 'asc' }
-    });
+    const groups = await withDbTimeout(
+      prisma.group.findMany({
+        include: { _count: { select: { students: true } } },
+        orderBy: { name: 'asc' }
+      }),
+      2000
+    );
     res.json(groups);
   } catch (err) {
-    if (isDbConnectionError(err)) {
-      console.warn('⚡ DB offline: Serving groups from local cache');
-      return res.json(localCache.groups || []);
-    }
-    res.status(500).json({ error: err.message });
+    console.warn('⚡ DB offline/timeout: Serving groups from local cache');
+    return res.json(localCache.groups || []);
   }
 });
 

@@ -7,20 +7,27 @@ const { logAction } = require('../utils/logAction');
 const { autoNotifySession, autoNotifyAttendance } = require('../utils/autoNotify');
 const { runBackgroundTask } = require('../utils/backgroundTask');
 
+const { isDbConnectionError, withDbTimeout, cache: localCache } = require('../utils/localDBSnapshot');
+
 // GET /api/sessions  (active only)
 router.get('/', requirePermission('sessions'), async (req, res) => {
   const prisma = req.app.locals.prisma;
   const { all } = req.query;
   try {
     const where = all === 'true' ? {} : { active: true };
-    const sessions = await prisma.session.findMany({
-      where,
-      include: { group: true },
-      orderBy: { date: 'desc' }
-    });
+    const sessions = await withDbTimeout(
+      prisma.session.findMany({
+        where,
+        include: { group: true },
+        orderBy: { date: 'desc' }
+      }),
+      2000
+    );
     res.json(sessions);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.warn('⚡ DB offline/timeout: Serving sessions from local cache');
+    const sessions = localCache.sessions || [];
+    return res.json(all === 'true' ? sessions : sessions.filter(s => s.active !== false));
   }
 });
 
